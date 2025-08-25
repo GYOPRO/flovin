@@ -1,6 +1,6 @@
 const CACHE = "flovin-v1";
 const ASSETS = [
-    "/", "/flovin_order.html",
+    "/html/index.html", "/html/flovin_order.html",
     "/manifest.webmanifest"
     // 필요하면 CSS/JS/이미지도 여기에 추가
 ];
@@ -18,6 +18,13 @@ self.addEventListener("activate", (e) => {
     );
     self.clients.claim();
 });
+
+if (url.pathname.endsWith('.css') || url.pathname.endsWith('.html')) {
+    event.respondWith(
+        fetch(event.request, { cache: 'no-store' }).catch(() => caches.match(event.request))
+    );
+    return;
+}
 
 // 네트워크 우선, 실패 시 캐시
 self.addEventListener("fetch", (e) => {
