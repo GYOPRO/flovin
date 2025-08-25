@@ -1,26 +1,29 @@
-import express from "express";
-import compression from "compression";
-import path from "path";
-import { fileURLToPath } from "url";
+// server.js (ESM)
+import express from 'express';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
+const app = express();
+
+// __dirname 대체
 const __filename = fileURLToPath(import.meta.url);
 const __dirname  = path.dirname(__filename);
 
-const app = express();
-app.use(compression());
+app.use(express.static(path.join(__dirname, 'public')));
 
-// 정적 파일 서빙 (public 폴더)
-app.use(express.static(path.join(__dirname, "public"), {
-    maxAge: "1d",
-    extensions: ["html"]
-}));
+app.get('/', (req, res) => {
+  res.redirect('/html/flovin_order.html');
+});
 
-// SPA 라우팅 보호
-app.get("*", (req, res) => {
-    res.sendFile(path.join(__dirname, "public/html", "flovin_order.html"));
+// 선택: MIME 보장
+app.get('/manifest.webmanifest', (req, res) => {
+  res.type('application/manifest+json');
+  res.sendFile(path.join(__dirname, 'public/manifest.webmanifest'));
+});
+app.get('/sw.js', (req, res) => {
+  res.type('application/javascript');
+  res.sendFile(path.join(__dirname, 'public/sw.js'));
 });
 
 const port = process.env.PORT || 3000;
-app.listen(port, () => {
-    console.log(`> http://localhost:${port}`);
-});
+app.listen(port, () => console.log(`http://localhost:${port}`));
