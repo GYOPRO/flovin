@@ -2,7 +2,6 @@ const CACHE = "flovin-v1";
 const ASSETS = [
     "/html/index.html", "/html/flovin_order.html",
     "/manifest.webmanifest"
-    // 필요하면 CSS/JS/이미지도 여기에 추가
 ];
 
 self.addEventListener("install", (e) => {
