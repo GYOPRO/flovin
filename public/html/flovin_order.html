@@ -363,6 +363,23 @@
             // 보이기
             element_wrap.style.display = 'block';
         }
+
+        function updateTitleForPrint() {
+                const today = new Date();
+                const yy = String(today.getFullYear()).slice(2);
+                const mm = String(today.getMonth() + 1).padStart(2, "0");
+                const dd = String(today.getDate()).padStart(2, "0");
+                const orderName = document.getElementById("orderName").value || "이름없음";
+                const firstItem = [...items.values()][0]?.name || "상품없음";
+
+                document.title = `${yy}${mm}${dd}_${orderName}_${firstItem}`;
+            }
+
+            // 버튼 클릭 시
+            document.getElementById("btnPrint").onclick = () => {
+                updateTitleForPrint();
+                window.print();
+            };
     </script>
 </body>
 
