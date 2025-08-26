@@ -116,6 +116,7 @@ textarea {
 
 .muted {
     color: var(--muted);
+    font-size: 12px;
 }
 
 .badge {
@@ -180,6 +181,7 @@ textarea {
     color: #ef4444;
     border-color: #f3d4d4;
     background: #fff8f8;
+    font-size: 11px;
 }
 
 .actions {
@@ -263,3 +265,82 @@ textarea {
     }
 }
 
+/* Custom Select */
+.cs {
+    position: relative;
+    width: 100%;
+}
+
+.cs__button {
+    width: 100%;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 10px 12px;
+    background: #fff;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+}
+
+.cs__button:focus {
+    outline: 2px solid #2563eb33;
+}
+
+.cs__placeholder {
+    color: var(--muted);
+}
+
+.cs__chev {
+    margin-left: 8px;
+    font-size: 12px;
+}
+
+.cs__list {
+    position: absolute;
+    left: 0;
+    right: 0;
+    top: calc(100% + 6px);
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .08);
+    overflow: auto;
+    z-index: 1000;
+    display: none;
+    max-height: 240px;
+}
+
+.cs.open .cs__list {
+    display: block;
+}
+
+.cs.flip .cs__list {
+    top: auto;
+    bottom: calc(100% + 6px);
+}
+
+.cs__item {
+    padding: 10px 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.cs__item:hover,
+.cs__item[aria-selected="true"] {
+    background: #f3f4f6;
+}
+
+.cs__sr-only {
+    position: absolute !important;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}

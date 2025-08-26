@@ -51,7 +51,7 @@
                         <select id="menu"><option value="">카테고리를 선택해주세요</option></select> 
                 </div>
             </div>
-            <div class="muted">메뉴표에 없는 세트 구성을 원하실 경우, 별도 문의해 주세요!</div>
+            <div class="muted">※ 메뉴표에 없는 세트 구성을 원하실 경우, 별도 문의해 주세요!</div>
         </div>
 
         <!-- 주문내역 -->
@@ -64,11 +64,11 @@
             <table class="table">
                 <thead>
                     <tr>
-                        <th>메뉴</th>
-                        <th style="width:120px">단가</th>
-                        <th style="width:160px">수량</th>
-                        <th style="width:100px" class="num">금액</th>
-                        <th style="width:80px"></th>
+                        <th style="width:50%">메뉴</th>
+                        <th style="width:12%" class="num">단가</th>
+                        <th style="width:10%">수량</th>
+                        <th style="width:12%" class="num">금액</th>
+                        <th style="width:10%"></th>
                     </tr>
                 </thead>
                 <tbody id="itemsBody"><!-- 행 자동 렌더 --></tbody>
@@ -92,17 +92,15 @@
         <!-- 배송 방식 선택 -->
         <div class="card grid">
             <div class="menu_title"><span>배송방식</span><span class="essential">*필수</span></div>
-            <div class="row">
+            <div class="row-1">
                 <div>
                     <select id="shipping">
                         <option value="방문 수령" data-fee="0">방문 수령</option>
                         <option value="택배" data-fee="4000">택배 (4,000원)</option>
                     </select>
                 </div>
-                <div style="line-height: 45px; height: 10px;">
-                    <span class="muted">* 유리돔은 파손 위험으로 <b>방문 수령만</b> 가능</span>
-                </div>
             </div>
+            <div class="muted">* 유리돔은 파손 위험으로 <b>방문 수령만</b> 가능</div>
         </div>
 
         <!-- 배송지 -->
@@ -227,14 +225,19 @@
             const shipName = shipOpt?.value || '직접수령';
             return { subtotal, shipFee, shipName, grand: subtotal + shipFee };
         }
-
+        const isGlassDome = (name) => typeof name === 'string' && name.includes('유리돔');
         function enforceShippingRule() {
-            const hasGlassDome = [...items.keys()].includes('유리돔');
+            const hasGlassDome = [...items.keys()].some(isGlassDome);
+
             const sel = $('#shipping');
             const courier = sel.querySelector('option[value="택배"]');
+
             if (hasGlassDome) {
                 if (courier) courier.disabled = true;
-                if (sel.value === '택배') { sel.value = '직접수령'; alert('유리돔은 파손 위험으로 직접수령만 가능해. 배송방식을 직접수령으로 변경했어.'); }
+                if (sel.value === '택배') {
+                    sel.value = '방문 수령'; 
+                    alert('유리돔은 파손 위험으로 방문 수령만 합니다. 배송방식을 방문 수령으로 변경했어요!.');
+                }
             } else {
                 if (courier) courier.disabled = false;
             }
@@ -249,15 +252,15 @@
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td>${it.name}</td>
-                    <td><input class="uprice" data-name="${it.name}" type="number" min="0" step="1" value="${it.price}" /></td>
+                    <td class="num">${fmt(it.price)}원</td>
                     <td>
                     <div style="display:flex;gap:6px;align-items:center;">
                         <button class="btn small" data-action="dec" data-name="${it.name}">-</button>
-                        <input class="qtyInput" data-name="${it.name}" type="number" min="0" step="1" value="${it.qty}" style="width:80px" />
+                        <input class="qtyInput" data-name="${it.name}" type="number" min="0" step="1" value="${it.qty}" style="width:50px" readonly/>
                         <button class="btn small" data-action="inc" data-name="${it.name}">+</button>
                     </div>
                     </td>
-                    <td class="num">${fmt(it.price * it.qty)}</td>
+                    <td class="num">${fmt(it.price * it.qty)}원</td>
                     <td class="num"><button class="btn danger small" data-action="del" data-name="${it.name}">삭제</button></td>
         `;
                 tbody.appendChild(tr);
