@@ -1,21 +1,24 @@
 // public/sw.js
 const CACHE = 'flovin-v1';
 const ASSETS = [
-  '/html/index.html',
-  '/html/flovin_order.html',
-  '/manifest.webmanifest'
+    '/html/index.html',
+    '/html/flovin_order.html',
+    '/manifest.webmanifest'
 ];
 
-self.addEventListener('install', e => {
-  e.waitUntil(caches.open(CACHE).then(c => c.addAll(ASSETS)));
-  self.skipWaiting();
+self.addEventListener('install', (e) => {
+    self.skipWaiting();
+});
+
+self.addEventListener('activate', (e) => {
+  e.waitUntil(clients.claim());
 });
 
 self.addEventListener('activate', e => {
-  e.waitUntil(
-    caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
-  );
-  self.clients.claim();
+    e.waitUntil(
+        caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    );
+    self.clients.claim();
 });
 
 // 네트워크 우선: HTML/CSS는 항상 최신 먼저

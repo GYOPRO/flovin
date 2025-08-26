@@ -5,9 +5,41 @@
     <title>FLOVIN - 주문서</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <link href="../css/flovin_order.css?v=1" rel="stylesheet">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+    
+    <!-- iOS 홈화면 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FLOVIN">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
+<script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(console.error);
+        });
+    }
+
+    // A2HS(설치) 사용자 정의 버튼을 쓰고 싶다면:
+    let deferredPrompt = null;
+    window.addEventListener('beforeinstallprompt', (e) => {
+        e.preventDefault();
+        deferredPrompt = e; // 저장
+        // 여기서 네 UI에 "앱 설치" 버튼을 보여줘도 됨
+    });
+
+    async function installApp() {
+        if (!deferredPrompt) return alert('설치 준비가 아직 안 됐어');
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        deferredPrompt = null;
+    }
+    // 예: <button onclick="installApp()" class="btn no-print">앱 설치</button>
+</script>
 
 <body>
+    <button onclick="installApp()" class="btn no-print">앱 설치</button>
     <div class="wrap">
         <header>
             <div class="logo">FLOVIN</div>
@@ -365,21 +397,21 @@
         }
 
         function updateTitleForPrint() {
-                const today = new Date();
-                const yy = String(today.getFullYear()).slice(2);
-                const mm = String(today.getMonth() + 1).padStart(2, "0");
-                const dd = String(today.getDate()).padStart(2, "0");
-                const orderName = document.getElementById("orderName").value || "이름없음";
-                const firstItem = [...items.values()][0]?.name || "상품없음";
+            const today = new Date();
+            const yy = String(today.getFullYear()).slice(2);
+            const mm = String(today.getMonth() + 1).padStart(2, "0");
+            const dd = String(today.getDate()).padStart(2, "0");
+            const orderName = document.getElementById("orderName").value || "이름없음";
+            const firstItem = [...items.values()][0]?.name || "상품없음";
 
-                document.title = `${yy}${mm}${dd}_${orderName}_${firstItem}`;
-            }
+            document.title = `${yy}${mm}${dd}_${orderName}_${firstItem}`;
+        }
 
-            // 버튼 클릭 시
-            document.getElementById("btnPrint").onclick = () => {
-                updateTitleForPrint();
-                window.print();
-            };
+        // 버튼 클릭 시
+        document.getElementById("btnPrint").onclick = () => {
+            updateTitleForPrint();
+            window.print();
+        };
     </script>
 </body>
 

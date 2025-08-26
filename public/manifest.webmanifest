@@ -1,13 +1,14 @@
 {
-    "name": "FLOVIN 주문서",
-    "short_name": "FLOVIN",
-    "start_url": "/",
-    "scope": "/",
-    "display": "standalone",
-    "background_color": "#ffffff",
-    "theme_color": "#2563eb",
-    "icons": [
-        { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
-        { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" }
-    ]
+  "name": "FLOVIN 주문서",
+  "short_name": "FLOVIN",
+  "start_url": "/html/flovin_order.html",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#111827",
+  "icons": [
+    { "src": "/icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icons/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable any" }
+  ]
 }
