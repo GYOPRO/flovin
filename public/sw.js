@@ -3,7 +3,8 @@ const CACHE = 'flovin-v1';
 const ASSETS = [
     '/html/index.html',
     '/html/flovin_order.html',
-    '/manifest.webmanifest'
+    '/manifest.webmanifest',
+    '/html/flovin_print_form.html'
 ];
 
 self.addEventListener('install', (e) => {

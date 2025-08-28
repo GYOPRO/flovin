@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="ko">
+<head>
+    <style>
+:root{
+  --inv-ink:#0f172a; --inv-muted:#64748b; --inv-line:#e2e8f0; --inv-accent:#ef4444;
+}
+
+/* 기본은 숨김 */
+#invoicePrint{ display:none; }
+
+/* ★ 공통 스타일(화면+인쇄) */
+#invoicePrint .sheet{ font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:var(--inv-ink); border:1px solid #e5e7eb; border-radius:12px; padding:14px; }
+#invoicePrint .topbar{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+#invoicePrint .brand{ font-size:24px; font-weight:900; letter-spacing:.5px; }
+#invoicePrint .tag{ color:var(--inv-accent); font-weight:900; letter-spacing:.5px; }
+#invoicePrint .meta{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:8px 0 14px; }
+#invoicePrint .box{ border:1px solid var(--inv-line); border-radius:8px; padding:10px; background:#fff; }
+#invoicePrint .box h4{ margin:0 0 6px; font-size:12px; color:#334155; letter-spacing:.2px; }
+#invoicePrint .muted{ color:var(--inv-muted); }
+#invoicePrint .kv{ display:grid; grid-template-columns:110px 1fr; row-gap:4px; column-gap:8px; }
+#invoicePrint table{ width:100%; border-collapse:collapse; }
+#invoicePrint thead th{ font-size:11px; color:#334155; text-align:left; padding:8px; border-bottom:1px solid var(--inv-line); }
+#invoicePrint tbody td{ padding:8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+#invoicePrint .num{ text-align:right; white-space:nowrap; }
+#invoicePrint .totals{ border:1px solid var(--inv-line); border-radius:8px; padding:10px; }
+#invoicePrint .totals .row{ display:grid; grid-template-columns:1fr auto; padding:6px 0; border-bottom:1px dashed #e5e7eb; }
+#invoicePrint .totals .row:last-child{ border-bottom:0; font-weight:800; }
+#invoicePrint .tiny{ font-size:11px; color:var(--inv-muted); }
+
+/* ★ 화면 미리보기 모드 */
+body.preview-invoice { background:#f3f4f6; }
+body.preview-invoice > .wrap{ display:none; }
+body.preview-invoice #invoicePrint{ display:block; max-width:960px; margin:24px auto; }
+
+/* ★ 실제 인쇄 전용 */
+@media print{
+  body>.wrap{ display:none !important; }
+  #invoicePrint{ display:block !important; }
+  @page{ size:A4 portrait; margin:12mm; }
+}
+
+    </style>
+
+    <meta charset="utf-8" />
+    <title>FLOVIN - 주문서</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="../css/flovin_order.css?v=1" rel="stylesheet">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <meta name="theme-color" content="#111827">
+
+    <!-- iOS 홈화면 -->
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="FLOVIN">
+    <link rel="apple-touch-icon" href="/icons/icon-192.png">
+</head>
+
+    <!-- ====== 출력 폼 ====== -->
+    <div id="invoicePrint" aria-hidden="true">
+        <div class="sheet">
+            <div class="topbar">
+                <div>
+                    <div class="brand">FLOVIN</div>
+                    <div class="tiny">https://flovin.imweb.me</div>
+                </div>
+                <div class="tag"></div>
+            </div>
+    
+            <!-- 상단 정보 -->
+            <div class="meta">
+                <div class="box">
+                    <h4>발신자</h4>
+                    <div class="tiny">FLOVIN</div>
+                    <div class="tiny" id="invFromContact">T. —</div>
+                    <div class="tiny" id="">flovin@naver.com</div>
+                </div>
+                <div class="box">
+                    <h4>주문자</h4>
+                    <div id="invBillName">-</div>
+                    <div class="tiny" id="invBillPhone">-</div>
+                    <div class="tiny" id="invBillEmail">-</div>
+                </div>
+            </div>
+    
+            <!-- 배송지 -->
+            <div class="box" style="margin-bottom:12px;">
+                <h4>배송지</h4>
+                <div class="kv">
+                    <div class="muted">결제/배송 방식</div>
+                    <div id="invPayMethod">-</div>
+                    <div class="muted">이름</div>
+                    <div id="invShipName">-</div>
+                    <div class="muted">연락처</div>
+                    <div id="invShipPhone">-</div>
+                    <div class="muted">배송지</div>
+                    <div id="invShipAddr">-</div>
+                </div>
+            </div>
+    
+            <!-- 품목표 -->
+            <div class="box" style="margin-bottom:12px;">
+                <table>
+                    <thead>
+                        <tr>
+                            <th style="width:44%;">내역</th>
+                            <th style="width:14%;" class="num">수량</th>
+                            <th style="width:18%;" class="num">가격</th>
+                            <th style="width:24%;" class="num">총가격</th>
+                        </tr>
+                    </thead>
+                    <tbody id="invItems"></tbody>
+                </table>
+                <div class="totals">
+                    <div class="row">
+                        <div>Subtotal</div>
+                        <div class="num" id="invSub">₩0</div>
+                    </div>
+                    <div class="row">
+                        <div>Shipping</div>
+                        <div class="num" id="invShipFee">₩0</div>
+                    </div>
+                    <div class="row">
+                        <div>Total</div>
+                        <div class="num" id="invTotal">₩0</div>
+                    </div>
+                </div>
+            </div>
+            <!-- 합계/메모 -->
+            <div class="box">
+                <h4>추가요청 사항</h4>
+                <div id="invNotes" class="tiny">-</div>
+            </div>
+    
+    
+            <div class="tiny" style="margin-top:10px;">
+                Payment Info · Bank: 0000-00-000000 (예금주 FLOVIN) · 문의: 010-0000-0000
+            </div>
+        </div>
+    </div>
+</html>
