@@ -374,3 +374,153 @@ textarea {
     white-space: nowrap;
     border: 0;
 }
+
+
+/*출력 폼*/
+:root {
+    --inv-ink: #0f172a;
+    --inv-muted: #64748b;
+    --inv-line: #e2e8f0;
+    --inv-accent: #ef4444;
+}
+
+/* 기본: 인보이스는 숨김 */
+#invoicePrint {
+    display: none;
+}
+
+@media print {
+    body>.wrap {
+        display: none !important;
+    }
+
+    /* 화면 폼 숨김 */
+    #invoicePrint {
+        display: block !important;
+    }
+
+    /* 인보이스만 출력 */
+    @page {
+        size: A4 portrait;
+        margin: 12mm;
+    }
+
+    #invoicePrint .sheet {
+        font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        color: var(--inv-ink);
+    }
+
+    #invoicePrint .sheet {
+        font: 12px/1.45 ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial;
+        color: var(--inv-ink);
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        padding: 14px;
+    }
+
+    #invoicePrint .topbar {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        margin-bottom: 12px;
+    }
+
+    #invoicePrint .brand {
+        font-size: 24px;
+        font-weight: 900;
+        letter-spacing: .5px;
+    }
+
+    #invoicePrint .tag {
+        color: var(--inv-accent);
+        font-weight: 900;
+        letter-spacing: .5px;
+    }
+
+    #invoicePrint .meta {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        margin: 8px 0 14px;
+    }
+
+    #invoicePrint .meta2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr;
+        gap: 8px;
+        margin: 8px 0 14px;
+    }
+
+    #invoicePrint .box {
+        border: 1px solid var(--inv-line);
+        border-radius: 8px;
+        padding: 10px;
+        background: #fff;
+    }
+
+    #invoicePrint .box h4 {
+        margin: 0 0 6px;
+        font-size: 12px;
+        color: #334155;
+        letter-spacing: .2px;
+    }
+
+    #invoicePrint .muted {
+        color: var(--inv-muted);
+    }
+
+    #invoicePrint .kv {
+        display: grid;
+        grid-template-columns: 110px 1fr;
+        row-gap: 4px;
+        column-gap: 8px;
+    }
+
+    #invoicePrint table {
+        width: 100%;
+        border-collapse: collapse;
+        margin-bottom: 5px;
+    }
+
+    #invoicePrint thead th {
+        font-size: 11px;
+        color: #334155;
+        text-align: left;
+        padding: 8px;
+        border-bottom: 1px solid var(--inv-line);
+    }
+
+    #invoicePrint tbody td {
+        padding: 8px;
+        border-bottom: 1px solid #f1f5f9;
+        vertical-align: middle;
+    }
+
+    #invoicePrint .num {
+        text-align: right;
+        white-space: nowrap;
+    }
+
+    #invoicePrint .totals {
+        border: 1px solid var(--inv-line);
+        border-radius: 8px;
+        padding: 10px;
+    }
+
+    #invoicePrint .totals .row {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        padding: 6px 0;
+        border-bottom: 1px dashed #e5e7eb;
+    }
+
+    #invoicePrint .totals .row:last-child {
+        border-bottom: 0;
+        font-weight: 800;
+    }
+
+    #invoicePrint .tiny {
+        font-size: 11px;
+        color: var(--inv-muted);
+    }
+}

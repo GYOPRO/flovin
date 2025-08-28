@@ -20,7 +20,7 @@
 #invoicePrint .box h4{ margin:0 0 6px; font-size:12px; color:#334155; letter-spacing:.2px; }
 #invoicePrint .muted{ color:var(--inv-muted); }
 #invoicePrint .kv{ display:grid; grid-template-columns:110px 1fr; row-gap:4px; column-gap:8px; }
-#invoicePrint table{ width:100%; border-collapse:collapse; }
+#invoicePrint table{ width:100%; border-collapse:collapse; margin-bottom: 5px;}
 #invoicePrint thead th{ font-size:11px; color:#334155; text-align:left; padding:8px; border-bottom:1px solid var(--inv-line); }
 #invoicePrint tbody td{ padding:8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
 #invoicePrint .num{ text-align:right; white-space:nowrap; }
@@ -77,9 +77,14 @@ body.preview-invoice #invoicePrint{ display:block; max-width:960px; margin:24px 
             <div class="meta">
                 <div class="box">
                     <h4>발신자</h4>
-                    <div class="">FLOVIN</div>
-                    <div class="" id="invFromContact">T. —</div>
-                    <div class="" id="">flovin@naver.com</div>
+                    <div class="kv">
+                        <div class="muted">상호명</div>
+                        <div id="">FLOVIN</div>
+                        <div class="muted">연락처</div>
+                        <div id="">T. 010-2940-7623</div>
+                        <div class="muted">이메일</div>
+                        <div id="">flovin@naver.com</div>
+                    </div>
                 </div>
                 <div class="box">
                     <h4>주문자</h4>
@@ -138,19 +143,19 @@ body.preview-invoice #invoicePrint{ display:block; max-width:960px; margin:24px 
                 </div>
             </div>
             <!-- 추가 요청 사항 -->
-
+    
             <div class="meta2">
                 <div class="box">
                     <h4>신랑 성함</h4>
-                    <div id="invBillName">ㄴㅇㅁ</div>
+                    <div id="invGroomName">ㄴㅇㅁ</div>
                 </div>
                 <div class="box">
                     <h4>신부 성함</h4>
-                    <div id="invBillName">ㄴㅇㅁ</div>
+                    <div id="invBrideName">ㄴㅇㅁ</div>
                 </div>
                 <div class="box">
                     <h4>결혼 날짜 / 기념일</h4>
-                    <div id="invBillName">-</div>
+                    <div id="invEventDate">-</div>
                 </div>
             </div>
             <div class="box">
@@ -164,4 +169,5 @@ body.preview-invoice #invoicePrint{ display:block; max-width:960px; margin:24px 
             </div>
         </div>
     </div>
+
 </html>
