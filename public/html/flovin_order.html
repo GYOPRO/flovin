@@ -36,140 +36,25 @@
                 color: var(--inv-ink);
             }
     
-            #invoicePrint .topbar {
-                display: flex;
-                justify-content: space-between;
-                align-items: flex-start;
-                margin-bottom: 12px;
-            }
-    
-            #invoicePrint .brand {
-                font-size: 24px;
-                font-weight: 900;
-                letter-spacing: .5px;
-            }
-    
-            #invoicePrint .tag {
-                color: var(--inv-accent);
-                font-weight: 900;
-                letter-spacing: .5px;
-            }
-    
-            #invoicePrint .meta {
-                display: grid;
-                grid-template-columns: 1fr 1fr 1fr;
-                gap: 8px;
-                margin: 8px 0 14px;
-            }
-    
-            #invoicePrint .box {
-                border: 1px solid var(--inv-line);
-                border-radius: 8px;
-                padding: 10px;
-                background: #fff;
-            }
-    
-            #invoicePrint .box h4 {
-                margin: 0 0 6px;
-                font-size: 12px;
-                color: #334155;
-                letter-spacing: .2px;
-            }
-    
-            #invoicePrint .muted {
-                color: var(--inv-muted);
-            }
-    
-            #invoicePrint .kv {
-                display: grid;
-                grid-template-columns: 110px 1fr;
-                row-gap: 4px;
-                column-gap: 8px;
-            }
-    
-            #invoicePrint .kv div {
-                padding: 0;
-            }
-    
-            #invoicePrint table {
-                width: 100%;
-                border-collapse: collapse;
-            }
-    
-            #invoicePrint thead th {
-                font-size: 11px;
-                color: #334155;
-                text-align: left;
-                padding: 8px 8px;
-                border-bottom: 1px solid var(--inv-line);
-            }
-    
-            #invoicePrint tbody td {
-                padding: 8px 8px;
-                border-bottom: 1px solid #f1f5f9;
-                vertical-align: middle;
-            }
-    
-            #invoicePrint tfoot th,
-            #invoicePrint tfoot td {
-                padding: 6px 8px;
-            }
-    
-            #invoicePrint .num {
-                text-align: right;
-                white-space: nowrap;
-            }
-    
-            #invoicePrint .rightcol {
-                display: grid;
-                grid-template-columns: 1fr 260px;
-                gap: 12px;
-                margin-top: 10px;
-            }
-    
-            #invoicePrint .totals {
-                border: 1px solid var(--inv-line);
-                border-radius: 8px;
-                padding: 10px;
-            }
-    
-            #invoicePrint .totals .row {
-                display: grid;
-                grid-template-columns: 1fr auto;
-                padding: 6px 0;
-                border-bottom: 1px dashed #e5e7eb;
-            }
-    
-            #invoicePrint .totals .row:last-child {
-                border-bottom: 0;
-                font-weight: 800;
-            }
-    
-            #invoicePrint .signs {
-                display: grid;
-                grid-template-columns: 1fr 1fr;
-                gap: 12px;
-                margin-top: 14px;
-            }
-    
-            #invoicePrint .signs .cell {
-                border: 1px solid var(--inv-line);
-                border-radius: 8px;
-                padding: 10px;
-                min-height: 70px;
-            }
-    
-            #invoicePrint .tiny {
-                font-size: 11px;
-                color: var(--inv-muted);
-            }
-    
-            /* 은은한 카드 느낌 */
-            #invoicePrint .sheet {
-                border: 1px solid #e5e7eb;
-                border-radius: 12px;
-                padding: 14px;
-            }
+            #invoicePrint .sheet{ font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial; color:var(--inv-ink); border:1px solid #e5e7eb; border-radius:12px; padding:14px; }
+            #invoicePrint .topbar{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
+            #invoicePrint .brand{ font-size:24px; font-weight:900; letter-spacing:.5px; }
+            #invoicePrint .tag{ color:var(--inv-accent); font-weight:900; letter-spacing:.5px; }
+            #invoicePrint .meta{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0 14px; }
+            #invoicePrint .meta2{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:8px 0 14px; }
+            #invoicePrint .box{ border:1px solid var(--inv-line); border-radius:8px; padding:10px; background:#fff; }
+            #invoicePrint .box h4{ margin:0 0 6px; font-size:12px; color:#334155; letter-spacing:.2px; }
+            #invoicePrint .muted{ color:var(--inv-muted); }
+            #invoicePrint .kv{ display:grid; grid-template-columns:110px 1fr; row-gap:4px; column-gap:8px; }
+            #invoicePrint table{ width:100%; border-collapse:collapse; }
+            #invoicePrint thead th{ font-size:11px; color:#334155; text-align:left; padding:8px; border-bottom:1px solid var(--inv-line); }
+            #invoicePrint tbody td{ padding:8px; border-bottom:1px solid #f1f5f9; vertical-align:middle; }
+            #invoicePrint .num{ text-align:right; white-space:nowrap; }
+            #invoicePrint .totals{ border:1px solid var(--inv-line); border-radius:8px; padding:10px; }
+            #invoicePrint .totals .row{ display:grid; grid-template-columns:1fr auto; padding:6px 0; border-bottom:1px dashed #e5e7eb; }
+            #invoicePrint .totals .row:last-child{ border-bottom:0; font-weight:800; }
+            #invoicePrint .tiny{ font-size:11px; color:var(--inv-muted); }
+
         }
     </style>
 
@@ -393,15 +278,26 @@
             <div class="meta">
                 <div class="box">
                     <h4>발신자</h4>
-                    <div class="tiny">FLOVIN</div>
-                    <div class="tiny" id="invFromContact">T. —</div>
-                    <div class="tiny" id="">flovin@naver.com</div>
+                    <div class="kv">
+                        <div class="muted">상호명</div>
+                        <div id="">FLOVIN</div>
+                        <div class="muted">연락처</div>
+                        <div id="">T. 010-2940-7623</div>
+                        <div class="muted">이메일</div>
+                        <div id="">flovin@naver.com</div>
+                        <div class="">FLOVIN</div>
+                    </div>
                 </div>
                 <div class="box">
                     <h4>주문자</h4>
-                    <div id="invBillName">-</div>
-                    <div class="tiny" id="invBillPhone">-</div>
-                    <div class="tiny" id="invBillEmail">-</div>
+                    <div class="kv">
+                        <div class="muted">성함</div>
+                        <div id="invBillName">-</div>
+                        <div class="muted">연락처</div>
+                        <div id="invBillPhone">-</div>
+                        <div class="muted">이메일</div>
+                        <div id="invBillEmail">-</div>
+                    </div>
                 </div>
             </div>
     
@@ -448,13 +344,28 @@
                     </div>
                 </div>
             </div>
-            <!-- 합계/메모 -->
-            <div class="box">
-                    <h4>추가요청 사항</h4>
-                    <div id="invNotes" class="tiny">-</div>
+            <!-- 추가 요청 사항 -->
+    
+            <div class="meta2">
+                <div class="box">
+                    <h4>신랑 성함</h4>
+                    <div id="invGroomName">ㄴㅇㅁ</div>
+                </div>
+                <div class="box">
+                    <h4>신부 성함</h4>
+                    <div id="invBrideName">ㄴㅇㅁ</div>
+                </div>
+                <div class="box">
+                    <h4>결혼 날짜 / 기념일</h4>
+                    <div id="invEventDate">-</div>
+                </div>
             </div>
-
-
+            <div class="box">
+                <h4>추가요청 사항</h4>
+                <div id="invNotes" class="tiny">-</div>
+            </div>
+    
+    
             <div class="tiny" style="margin-top:10px;">
                 Payment Info · Bank: 0000-00-000000 (예금주 FLOVIN) · 문의: 010-0000-0000
             </div>
@@ -730,7 +641,6 @@
                 document.getElementById('sample3_extraAddress')?.value,
             ].filter(Boolean).join(' ');
 
-            document.getElementById('invFromContact').textContent = 'T. 010-2940-7623'; // 원하면 상호 연락처 고정 입력
             document.getElementById('invBillName').textContent = orderName;
             document.getElementById('invBillPhone').textContent = orderPhone;
             document.getElementById('invBillEmail').textContent = orderEmail;
@@ -741,7 +651,7 @@
 
             // 메모/배송방식
             const memo = document.getElementById('memo')?.value?.trim();
-            document.getElementById('invNotes').textContent = memo || '감사합니다.';
+            document.getElementById('invNotes').textContent = memo || '-.';
             const shipSel = document.getElementById('shipping');
             const shipName = shipSel?.selectedOptions[0]?.value || '방문 수령';
             const shipFee = Number(shipSel?.selectedOptions[0]?.dataset?.fee) || 0;
@@ -773,12 +683,36 @@
             document.getElementById('invShipFee').textContent = curKR(shipFee);
             document.getElementById('invTotal').textContent = curKR(sub + shipFee);
 
-            // 파일 제목도 살짝
+            // 신랑신부 정보
+            const groomName = document.getElementById('groomName')?.value?.trim() || '-';
+            const brideName = document.getElementById('brideName')?.value?.trim() || '-';
+            const eventDate = document.getElementById('eventDate')?.value?.trim() || '-';
+            document.getElementById('invGroomName').textContent = groomName;
+            document.getElementById('invBrideName').textContent = brideName;
+            document.getElementById('invEventDate').textContent = eventDate;
+
+            // 날짜/파일 제목
             const yy = String(today.getFullYear()).slice(2);
             const mm = String(today.getMonth() + 1).padStart(2, '0');
             const dd = String(today.getDate()).padStart(2, '0');
-            const firstItem = (window.items && [...items.values()][0]?.name) || '상품없음';
-            document.title = `${yy}${mm}${dd}_${orderName || '이름없음'}_${firstItem}`;
+
+            // 품목명에서 특정 항목 제외 + 중복 제거
+            const skip = new Set(['건조 의뢰', '직접건조']);
+            const names = (window.items ? [...items.values()] : [])
+                .map(it => (it?.name ?? '').trim())
+                .filter(n => n && !skip.has(n));
+            const uniq = [...new Set(names)];
+
+            let titleItem;
+            if (uniq.length === 0) {
+                titleItem = '상품없음';
+            } else if (uniq.length <= 2) {
+                titleItem = uniq.join('_');
+            } else {
+                titleItem = `${uniq[0]}_${uniq[1]}_외${uniq.length - 2}건`;
+            }
+
+            document.title = `${yy}${mm}${dd}_${orderName || '이름없음'}_${titleItem}`;
         }
 
         // 버튼 다시 바인딩(네 기존 핸들러 대신 이걸로)

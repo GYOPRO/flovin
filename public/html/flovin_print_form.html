@@ -14,7 +14,8 @@
 #invoicePrint .topbar{ display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; }
 #invoicePrint .brand{ font-size:24px; font-weight:900; letter-spacing:.5px; }
 #invoicePrint .tag{ color:var(--inv-accent); font-weight:900; letter-spacing:.5px; }
-#invoicePrint .meta{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:8px 0 14px; }
+#invoicePrint .meta{ display:grid; grid-template-columns:1fr 1fr; gap:8px; margin:8px 0 14px; }
+#invoicePrint .meta2{ display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin:8px 0 14px; }
 #invoicePrint .box{ border:1px solid var(--inv-line); border-radius:8px; padding:10px; background:#fff; }
 #invoicePrint .box h4{ margin:0 0 6px; font-size:12px; color:#334155; letter-spacing:.2px; }
 #invoicePrint .muted{ color:var(--inv-muted); }
@@ -55,6 +56,11 @@ body.preview-invoice #invoicePrint{ display:block; max-width:960px; margin:24px 
     <meta name="apple-mobile-web-app-title" content="FLOVIN">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
+<script>
+    document.addEventListener('DOMContentLoaded', () => {
+        document.body.classList.add('preview-invoice'); // 화면 미리보기 ON
+    });
+</script>
 
     <!-- ====== 출력 폼 ====== -->
     <div id="invoicePrint" aria-hidden="true">
@@ -71,15 +77,20 @@ body.preview-invoice #invoicePrint{ display:block; max-width:960px; margin:24px 
             <div class="meta">
                 <div class="box">
                     <h4>발신자</h4>
-                    <div class="tiny">FLOVIN</div>
-                    <div class="tiny" id="invFromContact">T. —</div>
-                    <div class="tiny" id="">flovin@naver.com</div>
+                    <div class="">FLOVIN</div>
+                    <div class="" id="invFromContact">T. —</div>
+                    <div class="" id="">flovin@naver.com</div>
                 </div>
                 <div class="box">
                     <h4>주문자</h4>
-                    <div id="invBillName">-</div>
-                    <div class="tiny" id="invBillPhone">-</div>
-                    <div class="tiny" id="invBillEmail">-</div>
+                    <div class="kv">
+                        <div class="muted">성함</div>
+                        <div id="invBillName">-</div>
+                        <div class="muted">연락처</div>
+                        <div id="invBillPhone">-</div>
+                        <div class="muted">이메일</div>
+                        <div id="invBillEmail">-</div>
+                    </div>
                 </div>
             </div>
     
@@ -126,7 +137,22 @@ body.preview-invoice #invoicePrint{ display:block; max-width:960px; margin:24px 
                     </div>
                 </div>
             </div>
-            <!-- 합계/메모 -->
+            <!-- 추가 요청 사항 -->
+
+            <div class="meta2">
+                <div class="box">
+                    <h4>신랑 성함</h4>
+                    <div id="invBillName">ㄴㅇㅁ</div>
+                </div>
+                <div class="box">
+                    <h4>신부 성함</h4>
+                    <div id="invBillName">ㄴㅇㅁ</div>
+                </div>
+                <div class="box">
+                    <h4>결혼 날짜 / 기념일</h4>
+                    <div id="invBillName">-</div>
+                </div>
+            </div>
             <div class="box">
                 <h4>추가요청 사항</h4>
                 <div id="invNotes" class="tiny">-</div>
