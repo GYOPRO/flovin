@@ -2,10 +2,6 @@
 <html lang="ko">
 
 <head>
-    <style>
-
-    </style>
-
     <meta charset="utf-8" />
     <title>FLOVIN - 주문서</title>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -19,14 +15,6 @@
     <meta name="apple-mobile-web-app-title" content="FLOVIN">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
 </head>
-
-<script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-            navigator.serviceWorker.register('/sw.js').catch(console.error);
-        });
-    }
-</script>
 
 <body>
     <div class="wrap">
@@ -54,7 +42,7 @@
             </div>
         </div>
 
-        <!-- 메뉴 선택 -->
+        <!-- 메뉴 선택 (출력 제외) -->
         <div class="card grid no-print">
             <div class="menu_title"><span>메뉴</span><span class="essential">*필수</span></div>
             <div class="row-1">
@@ -128,9 +116,7 @@
 
         <!-- 배송지 -->
         <div class="card grid">
-            <div class="menu_title">
-                <span>배송지</span><span class="title_comment">* 방문 수령 시 생략</span>
-            </div>
+            <div class="menu_title"><span>배송지</span><span class="title_comment">* 방문 수령 시 생략</span></div>
 
             <div class="row-3">
                 <div>
@@ -172,6 +158,7 @@
                         <input type="text" id="sample3_extraAddress" placeholder="참고항목" readonly />
                     </div>
                 </div>
+                <!-- 카카오 우편번호 임베드 -->
                 <div id="wrap">
                     <img src="https://t1.daumcdn.net/postcode/resource/images/close.png" id="btnFoldWrap" alt="접기 버튼"
                         onclick="foldDaumPostcode()">
@@ -313,8 +300,15 @@
         </div>
     </div>
 
-    <!-- 주문/출력 스크립트 -->
+    <!-- ================= 스크립트 ================= -->
     <script>
+        // PWA SW 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js').catch(console.error);
+            });
+        }
+
         const nf = new Intl.NumberFormat('ko-KR');
         const $ = (s) => document.querySelector(s);
 
@@ -324,14 +318,13 @@
         const fmt = (n) => nf.format(Math.max(0, Number(n) || 0));
 
         let products = {};
-        let dryNameSet = new Set();                // ★ Dry 상품명 캐시
+        let dryNameSet = new Set();
         const norm = (s) => (s || '').replace(/\s+/g, '').trim();
         const isDryName = (name) => dryNameSet.has(norm(name));
 
         async function loadProducts() {
             const res = await fetch('/data/product.json', { cache: 'no-store' });
             products = await res.json();
-            // ★ Dry 카테고리 이름셋 구성
             dryNameSet = new Set((products?.dry || []).map(p => norm(p.name)));
         }
 
@@ -363,7 +356,7 @@
             if (digits.length <= 10) return digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6);
             return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
         }
-        function formatPhoneInput(el) { el.value = formatKRPhoneDigits(el.value); }
+        const formatPhoneInput = (el) => el.value = formatKRPhoneDigits(el.value);
 
         // 주문자와 동일
         function copyRecipient() {
@@ -399,7 +392,7 @@
             }
         }
 
-        // ★ Dry 단일 선택 유틸
+        // Dry 단일 선택
         function hasDryInCart() {
             for (const k of items.keys()) if (isDryName(k)) return true;
             return false;
@@ -410,23 +403,16 @@
             }
         }
 
-        // ★ addOrIncItem: Dry면 한 종류만 유지
         function addOrIncItem(name, price, qty = 1) {
             if (!name) return;
-
             if (isDryName(name)) {
-                if (hasDryInCart() && !items.has(name)) {
-                    alert('Dry 카테고리 상품은 한 종류만 선택할 수 있어 기존 항목을 교체합니다.');
-                }
+                if (hasDryInCart() && !items.has(name)) alert('Dry 카테고리 상품은 한 종류만 선택할 수 있어 기존 항목을 교체합니다.');
                 removeOtherDryLines(name);
             }
-
             if (items.has(name)) items.get(name).qty += qty;
             else items.set(name, { name, price: Number(price) || 0, qty: Number(qty) || 1 });
-
             render();
         }
-
         function setQty(name, qty) {
             const it = items.get(name); if (!it) return;
             it.qty = Math.max(0, Number(qty) || 0);
@@ -446,7 +432,6 @@
 
         function render() {
             enforceShippingRule();
-
             const tbody = $('#itemsBody');
             tbody.innerHTML = '';
             items.forEach(it => {
@@ -505,9 +490,10 @@
             sel.value = '';
         }
 
-        // 출력용
+        // 통화 포맷
         const curKR = (n) => '₩' + (new Intl.NumberFormat('ko-KR').format(Math.max(0, Number(n) || 0)));
 
+        // 인보이스 렌더 + 제목/시간
         function renderInvoice() {
             const orderName = $('#orderName')?.value?.trim() || '-';
             const orderPhone = $('#orderPhone')?.value?.trim() || '-';
@@ -560,13 +546,91 @@
             $('#invBrideName').textContent = $('#brideName')?.value?.trim() || '-';
             $('#invEventDate').textContent = $('#eventDate')?.value?.trim() || '-';
 
-            // 파일 제목(간단 버전)
-            const today = new Date();
-            const yy = String(today.getFullYear()).slice(2);
-            const mm = String(today.getMonth() + 1).padStart(2, '0');
-            const dd = String(today.getDate()).padStart(2, '0');
+            // 상단 우측 현재 시간
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, '0');
+            const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+            document.querySelector('#invoicePrint .tag').textContent = stamp;
+
+            // 파일 제목: yymmdd_이름_첫상품
+            const yy = String(now.getFullYear()).slice(2);
+            const mm = pad(now.getMonth() + 1);
+            const dd = pad(now.getDate());
             const firstItem = (window.items && [...items.values()][0]?.name) || '상품없음';
             document.title = `${yy}${mm}${dd}_${orderName || '이름없음'}_${firstItem}`;
+        }
+
+        // 출력용 HTML(iframe에 주입)
+        function buildInvoiceHTML() {
+            renderInvoice();
+            const css = `
+        @page{size:A4 portrait;margin:12mm;}
+        @media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+        body{font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#0f172a;}
+        .sheet{border:1px solid #e5e7eb;border-radius:12px;padding:14px;}
+        .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+        .brand{font-size:24px;font-weight:900;letter-spacing:.5px;}
+        .tag{color:#ef4444;font-weight:900;letter-spacing:.5px;}
+        .meta,.meta2{display:grid;gap:8px;margin:8px 0 14px;}
+        .meta{grid-template-columns:1fr 1fr;}
+        .meta2{grid-template-columns:1fr 1fr 1fr;}
+        .box{border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;}
+        .box h4{margin:0 0 6px;font-size:12px;color:#334155;letter-spacing:.2px;}
+        .kv{display:grid;grid-template-columns:110px 1fr;row-gap:4px;column-gap:8px;}
+        table{width:100%;border-collapse:collapse;}
+        thead th{font-size:11px;color:#334155;text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;}
+        tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+        .num{text-align:right;white-space:nowrap;}
+        .totals{border:1px solid #e2e8f0;border-radius:8px;padding:10px;}
+        .totals .row{display:grid;grid-template-columns:1fr auto;padding:6px 0;border-bottom:1px dashed #e5e7eb;}
+        .totals .row:last-child{border-bottom:0;font-weight:800;}
+        .tiny{font-size:11px;color:#64748b;}
+      `;
+            return `
+        <!doctype html><html lang="ko"><head>
+          <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+          <title>${document.title}</title>
+          <style>${css}</style>
+        </head><body>
+          <div class="sheet">
+            ${document.querySelector('#invoicePrint').innerHTML}
+          </div>
+        </body></html>`;
+        }
+
+        // ⭐ 갤럭시/안드로이드 안전 프린트: 숨은 iframe 사용 (사용자 제스처 유지)
+        function printInvoiceSafe() {
+            const html = buildInvoiceHTML();
+
+            const iframe = document.createElement('iframe');
+            iframe.style.position = 'fixed';
+            iframe.style.right = '0';
+            iframe.style.bottom = '0';
+            iframe.style.width = '0';
+            iframe.style.height = '0';
+            iframe.style.border = '0';
+            iframe.setAttribute('sandbox', 'allow-modals allow-same-origin allow-scripts');
+
+            document.body.appendChild(iframe);
+
+            if ('srcdoc' in iframe) {
+                iframe.srcdoc = html;
+            } else {
+                const doc = iframe.contentWindow || iframe.contentDocument;
+                const idoc = doc.document || doc;
+                idoc.open(); idoc.write(html); idoc.close();
+            }
+
+            iframe.onload = () => {
+                try {
+                    iframe.contentWindow.focus();
+                    iframe.contentWindow.print();
+                } catch (e) {
+                    alert('이 기기에서 인쇄 대화상자를 열 수 없어요.');
+                } finally {
+                    setTimeout(() => document.body.removeChild(iframe), 1500);
+                }
+            };
         }
 
         // 이벤트 바인딩
@@ -582,6 +646,9 @@
             $('#sameAsOrder').addEventListener('change', syncRecipientFromOrder);
             $('#orderName').addEventListener('input', () => { if ($('#sameAsOrder').checked) copyRecipient(); });
             $('#orderPhone').addEventListener('input', () => { if ($('#sameAsOrder').checked) copyRecipient(); });
+
+            // 프린트 버튼(모든 플랫폼 공통)
+            document.getElementById('btnPrint').onclick = () => { printInvoiceSafe(); };
 
             render();
         });
@@ -617,81 +684,11 @@
                     document.body.scrollTop = currentScroll;
                 },
                 onresize: function (size) { element_wrap.style.height = size.height + 'px'; },
-                width: '100%',
-                height: '100%'
+                width: '100%', height: '100%'
             }).embed(element_wrap);
             element_wrap.style.display = 'block';
         }
     </script>
-
-    <script>
-        // 인앱/스탠드얼론/PWA/안드로이드 판별
-        const UA = navigator.userAgent || '';
-        const isAndroid = /Android/i.test(UA);
-        const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches) || window.navigator.standalone;
-        const isInApp = /(KAKAOTALK|NAVER|FBAN|FBAV|Instagram|Line|wv)/i.test(UA);
-
-        // 팝업에 인보이스만 렌더해서 인쇄(안드로이드 안전 모드)
-        function printInvoiceInPopup() {
-            renderInvoice();
-
-            const css = `
-            @page{size:A4 portrait;margin:12mm;}
-            body{font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#0f172a;}
-            .sheet{border:1px solid #e5e7eb;border-radius:12px;padding:14px;}
-            .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
-            .brand{font-size:24px;font-weight:900;letter-spacing:.5px;}
-            .tag{color:#ef4444;font-weight:900;letter-spacing:.5px;}
-            .meta,.meta2{display:grid;gap:8px;margin:8px 0 14px;}
-            .meta{grid-template-columns:1fr 1fr;}
-            .meta2{grid-template-columns:1fr 1fr 1fr;}
-            .box{border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;}
-            .box h4{margin:0 0 6px;font-size:12px;color:#334155;letter-spacing:.2px;}
-            .kv{display:grid;grid-template-columns:110px 1fr;row-gap:4px;column-gap:8px;}
-            table{width:100%;border-collapse:collapse;}
-            thead th{font-size:11px;color:#334155;text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;}
-            tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
-            .num{text-align:right;white-space:nowrap;}
-            .totals{border:1px solid #e2e8f0;border-radius:8px;padding:10px;}
-            .totals .row{display:grid;grid-template-columns:1fr auto;padding:6px 0;border-bottom:1px dashed #e5e7eb;}
-            .totals .row:last-child{border-bottom:0;font-weight:800;}
-            .tiny{font-size:11px;color:#64748b;}
-        `;
-
-            const html = `
-            <!doctype html><html lang="ko"><head>
-            <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-            <title>${document.title}</title>
-            <style>${css}</style>
-            </head><body>
-            <div class="sheet">
-                ${document.querySelector('#invoicePrint').innerHTML}
-            </div>
-            <script>
-                window.addEventListener('load', function(){
-                setTimeout(function(){ try{ window.print(); }catch(e){} }, 100);
-                });
-                window.addEventListener('afterprint', function(){ setTimeout(function(){ window.close(); }, 100); });
-            <\/script>
-            </body></html>
-        `;
-
-            const w = window.open('', '_blank');
-            if (!w) { alert('팝업이 차단되었어요. 팝업 허용 후 다시 시도해주세요.'); return; }
-            w.document.open(); w.document.write(html); w.document.close();
-        }
-
-        // 버튼: iOS/데스크탑은 기존 print, 안드로이드/PWA/인앱은 팝업 우회
-        document.getElementById('btnPrint').onclick = () => {
-            if (isAndroid || isStandalone || isInApp) {
-                printInvoiceInPopup();
-            } else {
-                renderInvoice();
-                window.print();
-            }
-        };
-    </script>
-
 </body>
 
 </html>
