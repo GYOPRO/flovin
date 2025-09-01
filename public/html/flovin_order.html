@@ -180,7 +180,9 @@
                 </div>
                 <div>
                     <label>결혼 날짜 / 기념일</label>
-                    <input type="text" id="eventDate" placeholder="예: 2025-10-18" />
+                    <div class="date-field">
+                        <input type="date" id="eventDate" placeholder="2025-01-01" inputmode="numeric" pattern="\d{4}-\d{2}-\d{2}" />
+                    </div>
                 </div>
             </div>
         </div>
@@ -302,475 +304,523 @@
     </div>
 
     <!-- ================= 스크립트 ================= -->
-    <script>
-        // PWA SW 등록
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/sw.js').catch(console.error);
-            });
-        }
-
-        const nf = new Intl.NumberFormat('ko-KR');
-        const $ = (s) => document.querySelector(s);
-
-        const items = new Map();
-        window.items = items;
-
-        const fmt = (n) => nf.format(Math.max(0, Number(n) || 0));
-
-        let products = {};
-        let dryNameSet = new Set();
-        const norm = (s) => (s || '').replace(/\s+/g, '').trim();
-        const isDryName = (name) => dryNameSet.has(norm(name));
-
-        async function loadProducts() {
-            const res = await fetch('/data/product.json', { cache: 'no-store' });
-            products = await res.json();
-            dryNameSet = new Set((products?.dry || []).map(p => norm(p.name)));
-        }
-
-        function updateMenuOptions(cat) {
-            const menu = $('#menu');
-            menu.innerHTML = '<option value="">상품 선택</option>';
-            if (products[cat]) {
-                products[cat].forEach(p => {
-                    const opt = document.createElement('option');
-                    opt.value = p.name;
-                    opt.dataset.price = p.price;
-                    opt.textContent = `${p.name} (${nf.format(p.price)}원)`;
-                    menu.appendChild(opt);
-                });
-            }
-        }
-
-        // 전화번호 포맷
-        function formatKRPhoneDigits(digits) {
-            digits = (digits || '').replace(/\D/g, '');
-            if (digits.startsWith('02')) {
-                if (digits.length <= 2) return digits;
-                if (digits.length <= 5) return digits.slice(0, 2) + '-' + digits.slice(2);
-                const mid = digits.length === 9 ? 3 : (digits.length - 6);
-                return digits.slice(0, 2) + '-' + digits.slice(2, 2 + mid) + '-' + digits.slice(2 + mid);
-            }
-            if (digits.length <= 3) return digits;
-            if (digits.length <= 7) return digits.slice(0, 3) + '-' + digits.slice(3);
-            if (digits.length <= 10) return digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6);
-            return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
-        }
-        const formatPhoneInput = (el) => el.value = formatKRPhoneDigits(el.value);
-
-        // 주문자와 동일
-        function copyRecipient() {
-            $('#recvName').value = $('#orderName').value;
-            $('#recvPhone').value = formatKRPhoneDigits($('#orderPhone').value);
-        }
-        function syncRecipientFromOrder() {
-            const checked = $('#sameAsOrder').checked;
-            if (checked) {
-                copyRecipient();
-                $('#recvName').readOnly = true;
-                $('#recvPhone').readOnly = true;
-            } else {
-                $('#recvName').readOnly = false;
-                $('#recvPhone').readOnly = false;
-            }
-        }
-
-        // 유리돔 규칙
-        const isGlassDome = (name) => typeof name === 'string' && name.includes('유리돔');
-        function enforceShippingRule() {
-            const hasGlassDome = [...items.keys()].some(isGlassDome);
-            const sel = $('#shipping');
-            const courier = sel.querySelector('option[value="택배"]');
-            if (hasGlassDome) {
-                if (courier) courier.disabled = true;
-                if (sel.value === '택배') {
-                    sel.value = '방문 수령';
-                    alert('유리돔은 파손 위험으로 방문 수령만 합니다. 배송방식을 방문 수령으로 변경했어요!.');
-                }
-            } else {
-                if (courier) courier.disabled = false;
-            }
-        }
-
-        // Dry 단일 선택
-        function hasDryInCart() {
-            for (const k of items.keys()) if (isDryName(k)) return true;
-            return false;
-        }
-        function removeOtherDryLines(exceptName) {
-            for (const k of [...items.keys()]) {
-                if (isDryName(k) && norm(k) !== norm(exceptName)) items.delete(k);
-            }
-        }
-
-        function addOrIncItem(name, price, qty = 1) {
-            if (!name) return;
-            if (isDryName(name)) {
-                if (hasDryInCart() && !items.has(name)) alert('Dry 카테고리 상품은 한 종류만 선택할 수 있어 기존 항목을 교체합니다.');
-                removeOtherDryLines(name);
-            }
-            if (items.has(name)) items.get(name).qty += qty;
-            else items.set(name, { name, price: Number(price) || 0, qty: Number(qty) || 1 });
-            render();
-        }
-        function setQty(name, qty) {
-            const it = items.get(name); if (!it) return;
-            it.qty = Math.max(0, Number(qty) || 0);
-            if (it.qty === 0) items.delete(name);
-            render();
-        }
-        function removeItem(name) { items.delete(name); render(); }
-
-        function getTotals() {
-            let subtotal = 0;
-            items.forEach(it => subtotal += it.price * it.qty);
-            const shipOpt = $('#shipping').selectedOptions[0];
-            const shipFee = Number(shipOpt?.dataset?.fee) || 0;
-            const shipName = shipOpt?.value || '직접수령';
-            return { subtotal, shipFee, shipName, grand: subtotal + shipFee };
-        }
-
-        function render() {
-            enforceShippingRule();
-            const tbody = $('#itemsBody');
-            tbody.innerHTML = '';
-            items.forEach(it => {
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-          <td>${it.name}</td>
-          <td class="num">${fmt(it.price)}원</td>
-          <td>
-            <div style="display:flex;gap:6px;align-items:center;">
-              <button class="btn small" data-action="dec" data-name="${it.name}">-</button>
-              <input class="qtyInput" data-name="${it.name}" type="number" min="0" step="1" value="${it.qty}" style="width:50px" readonly/>
-              <button class="btn small" data-action="inc" data-name="${it.name}">+</button>
-            </div>
-          </td>
-          <td class="num">${fmt(it.price * it.qty)}원</td>
-          <td class="num"><button class="btn danger small" data-action="del" data-name="${it.name}">삭제</button></td>
-        `;
-                tbody.appendChild(tr);
-            });
-
-            tbody.onclick = (e) => {
-                const btn = e.target.closest('button'); if (!btn) return;
-                const name = btn.dataset.name; const it = items.get(name); if (!it) return;
-                if (btn.dataset.action === 'inc') setQty(name, it.qty + 1);
-                if (btn.dataset.action === 'dec') setQty(name, it.qty - 1);
-                if (btn.dataset.action === 'del') removeItem(name);
-            };
-
-            const { subtotal, shipFee, shipName, grand } = getTotals();
-            $('#subtotal').textContent = fmt(subtotal);
-            $('#shipFee').textContent = fmt(shipFee);
-            $('#shipName').textContent = shipName;
-            $('#grand').textContent = fmt(grand);
-            $('#sumSub').textContent = fmt(subtotal);
-            $('#sumShip').textContent = fmt(shipFee);
-
-            const cnt = [...items.values()].reduce((a, b) => a + b.qty, 0);
-            $('#summaryText').textContent = cnt ? `총 ${cnt}개 품목` : '항목이 없습니다';
-        }
-
-        function onMenuChange() {
-            const sel = $('#menu');
-            const opt = sel.selectedOptions[0];
-            const name = sel.value;
-            if (!name) return;
-
-            if (name === '직접입력') {
-                const n = (prompt('메뉴명을 입력하세요', '') || '').trim();
-                if (!n) { sel.value = ''; return; }
-                const p = Number(prompt('가격(원)을 입력하세요', '0'));
-                if (!Number.isFinite(p) || p < 0) { sel.value = ''; return; }
-                addOrIncItem(n, Math.round(p), 1);
-            } else {
-                addOrIncItem(name, Number(opt.dataset.price) || 0, 1);
-            }
-            sel.value = '';
-        }
-
-        // 통화 포맷
-        const curKR = (n) => '₩' + (new Intl.NumberFormat('ko-KR').format(Math.max(0, Number(n) || 0)));
-
-        // 인보이스 렌더 + 제목/시간
-        function renderInvoice() {
-            const orderName = $('#orderName')?.value?.trim() || '-';
-            const orderPhone = $('#orderPhone')?.value?.trim() || '-';
-            const orderEmail = $('#orderEmail')?.value?.trim() || '-';
-
-            const recvName = $('#recvName')?.value?.trim() || orderName || '-';
-            const recvPhone = $('#recvPhone')?.value?.trim() || orderPhone || '-';
-            const addr = [
-                $('#sample3_postcode')?.value,
-                $('#sample3_address')?.value,
-                $('#sample3_detailAddress')?.value,
-                $('#sample3_extraAddress')?.value,
-            ].filter(Boolean).join(' ');
-
-            $('#invBillName').textContent = orderName;
-            $('#invBillPhone').textContent = orderPhone;
-            $('#invBillEmail').textContent = orderEmail;
-            $('#invShipName').textContent = recvName;
-            $('#invShipPhone').textContent = recvPhone;
-            $('#invShipAddr').textContent = addr || '-';
-
-            const memo = $('#memo')?.value?.trim();
-            $('#invNotes').textContent = memo || '-';
-            const shipSel = $('#shipping');
-            const shipName = shipSel?.selectedOptions[0]?.value || '방문 수령';
-            const shipFee = Number(shipSel?.selectedOptions[0]?.dataset?.fee) || 0;
-            $('#invPayMethod').textContent = shipName;
-
-            const tbody = $('#invItems');
-            tbody.innerHTML = '';
-            let sub = 0;
-            (window.items ? [...items.values()] : []).forEach(it => {
-                const amt = (Number(it.price) || 0) * (Number(it.qty) || 0);
-                sub += amt;
-                const tr = document.createElement('tr');
-                tr.innerHTML = `
-          <td>${it.name}</td>
-          <td class="num">${it.qty}</td>
-          <td class="num">${curKR(it.price)}</td>
-          <td class="num">${curKR(amt)}</td>
-        `;
-                tbody.appendChild(tr);
-            });
-            $('#invSub').textContent = curKR(sub);
-            $('#invShipFee').textContent = curKR(shipFee);
-            $('#invTotal').textContent = curKR(sub + shipFee);
-
-            // 신랑신부
-            $('#invGroomName').textContent = $('#groomName')?.value?.trim() || '-';
-            $('#invBrideName').textContent = $('#brideName')?.value?.trim() || '-';
-            $('#invEventDate').textContent = $('#eventDate')?.value?.trim() || '-';
-
-            // 상단 우측 현재 시간
-            const now = new Date();
-            const pad = (n) => String(n).padStart(2, '0');
-            const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
-            document.querySelector('#invoicePrint .tag').textContent = stamp;
-
-            // 파일 제목: yymmdd_이름_첫상품
-            const yy = String(now.getFullYear()).slice(2);
-            const mm = pad(now.getMonth() + 1);
-            const dd = pad(now.getDate());
-            const firstItem = (window.items && [...items.values()][0]?.name) || '상품없음';
-            document.title = `${yy}${mm}${dd}_${orderName || '이름없음'}_${firstItem}`;
-        }
-
-        // 출력용 HTML(iframe에 주입)
-        function buildInvoiceHTML() {
-            renderInvoice();
-            const css = `
-        @page{size:A4 portrait;margin:12mm;}
-        @media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-        body{font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#0f172a;}
-        /* 고정 폭: 화면 캡처 품질 일정하게 */
-        .sheet{border:1px solid #e5e7eb;border-radius:12px;padding:14px; width:794px; margin:0 auto; background:#fff;}
-        .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
-        .brand{font-size:24px;font-weight:900;letter-spacing:.5px;}
-        .tag{color:#ef4444;font-weight:900;letter-spacing:.5px;}
-        .meta,.meta2{display:grid;gap:8px;margin:8px 0 14px;}
-        .meta{grid-template-columns:1fr 1fr;}
-        .meta2{grid-template-columns:1fr 1fr 1fr;}
-        .box{border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;}
-        .box h4{margin:0 0 6px;font-size:12px;color:#334155;letter-spacing:.2px;}
-        .kv{display:grid;grid-template-columns:110px 1fr;row-gap:4px;column-gap:8px;}
-        table{width:100%;border-collapse:collapse;}
-        thead th{font-size:11px;color:#334155;text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;}
-        tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
-        .num{text-align:right;white-space:nowrap;}
-        .totals{border:1px solid #e2e8f0;border-radius:8px;padding:10px;}
-        .totals .row{display:grid;grid-template-columns:1fr auto;padding:6px 0;border-bottom:1px dashed #e5e7eb;}
-        .totals .row:last-child{border-bottom:0;font-weight:800;}
-        .tiny{font-size:11px;color:#64748b;}
-      `;
-            return `
-        <!doctype html><html lang="ko"><head>
-          <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-          <title>${document.title}</title>
-          <style>html,body{margin:0;padding:0}${css}</style>
-        </head><body>
-            ${document.querySelector('#invoicePrint').innerHTML}
-        </body></html>`;
-        }
-
-        // ⭐ 갤럭시/안드로이드 안전 프린트: 숨은 iframe 사용 (사용자 제스처 유지)
-        function printInvoiceSafe() {
-            const html = buildInvoiceHTML();
-
-            const iframe = document.createElement('iframe');
-            iframe.style.position = 'fixed';
-            iframe.style.right = '0';
-            iframe.style.bottom = '0';
-            iframe.style.width = '0';
-            iframe.style.height = '0';
-            iframe.style.border = '0';
-            iframe.setAttribute('sandbox', 'allow-modals allow-same-origin allow-scripts');
-
-            document.body.appendChild(iframe);
-
-            if ('srcdoc' in iframe) {
-                iframe.srcdoc = html;
-            } else {
-                const doc = iframe.contentWindow || iframe.contentDocument;
-                const idoc = doc.document || doc;
-                idoc.open(); idoc.write(html); idoc.close();
-            }
-
-            iframe.onload = () => {
-                try {
-                    iframe.contentWindow.focus();
-                    iframe.contentWindow.print();
-                } catch (e) {
-                    alert('이 기기에서 인쇄 대화상자를 열 수 없어요.');
-                } finally {
-                    setTimeout(() => document.body.removeChild(iframe), 1500);
-                }
-            };
-        }
-
-        // ⭐ 새로 추가: 외부 라이브러리 없이 SVG foreignObject로 깨끗한 PNG 내보내기
-        async function exportInvoicePNG() {
-            try {
-                renderInvoice();
-                // 1) 출력용 CSS (buildInvoiceHTML과 동일 폭/스타일)
-                const css = `
-        @page{size:A4 portrait;margin:12mm;}
-        @media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
-        html,body{margin:0;padding:0}
-        body{font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#0f172a;background:#fff;}
-        .sheet{border:1px solid #e5e7eb;border-radius:12px;padding:14px; width:794px; margin:0 auto; background:#fff;}
-        .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
-        .brand{font-size:24px;font-weight:900;letter-spacing:.5px;}
-        .tag{color:#ef4444;font-weight:900;letter-spacing:.5px;}
-        .meta,.meta2{display:grid;gap:8px;margin:8px 0 14px;}
-        .meta{grid-template-columns:1fr 1fr;}
-        .meta2{grid-template-columns:1fr 1fr 1fr;}
-        .box{border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;}
-        .box h4{margin:0 0 6px;font-size:12px;color:#334155;letter-spacing:.2px;}
-        .kv{display:grid;grid-template-columns:110px 1fr;row-gap:4px;column-gap:8px;}
-        table{width:100%;border-collapse:collapse;}
-        thead th{font-size:11px;color:#334155;text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;}
-        tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
-        .num{text-align:right;white-space:nowrap;}
-        .totals{border:1px solid #e2e8f0;border-radius:8px;padding:10px;}
-        .totals .row{display:grid;grid-template-columns:1fr auto;padding:6px 0;border-bottom:1px dashed #e5e7eb;}
-        .totals .row:last-child{border-bottom:0;font-weight:800;}
-        .tiny{font-size:11px;color:#64748b;}
-        `;
-
-                // 2) 화면 밖에서 실제 렌더 높이를 먼저 계산
-                const ghost = document.createElement('div');
-                ghost.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:794px;visibility:hidden;';
-                ghost.innerHTML = `<style>${css}</style>${document.querySelector('#invoicePrint').innerHTML}`;
-                document.body.appendChild(ghost);
-                const h = Math.ceil(ghost.querySelector('.sheet').getBoundingClientRect().height);
-                const w = 794;
-
-                // 3) SVG foreignObject로 HTML을 이미지로 변환 (폰트/라인 가장 깔끔)
-                const svg = `<?xml version="1.0" encoding="UTF-8"?>
-`+
-                    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">` +
-                    `<foreignObject width="100%" height="100%">` +
-                    `<div xmlns="http://www.w3.org/1999/xhtml"><style>${css}</style><div class="sheet">${document.querySelector('#invoicePrint').innerHTML}</div></div>` +
-                    `</foreignObject></svg>`;
-
-                const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-                const url = URL.createObjectURL(blob);
-                const img = new Image();
-                const scale = Math.min(3, (window.devicePixelRatio || 1) * 2);
-
-                await new Promise((resolve, reject) => {
-                    img.onload = () => resolve();
-                    img.onerror = reject;
-                    img.src = url;
-                });
-
-                const canvas = document.createElement('canvas');
-                canvas.width = w * scale;
-                canvas.height = h * scale;
-                const ctx = canvas.getContext('2d');
-                ctx.setTransform(scale, 0, 0, scale, 0, 0);
-                ctx.fillStyle = '#ffffff';
-                ctx.fillRect(0, 0, w, h);
-                ctx.drawImage(img, 0, 0);
-
-                URL.revokeObjectURL(url);
-                document.body.removeChild(ghost);
-
-                const a = document.createElement('a');
-                a.download = `${document.title || 'flovin_invoice'}.png`;
-                a.href = canvas.toDataURL('image/png');
-                a.click();
-            } catch (e) {
-                console.error(e);
-                alert('이미지 변환에 실패했어.');
-            }
-        }
-
-        // 이벤트 바인딩
-        document.addEventListener('DOMContentLoaded', async () => {
-            await loadProducts();
-            $('#category').addEventListener('change', (e) => updateMenuOptions(e.target.value));
-            $('#menu').addEventListener('change', onMenuChange);
-            $('#shipping').addEventListener('change', render);
-            $('#clear').onclick = () => { items.clear(); render(); };
-
-            $('#orderPhone').addEventListener('input', () => formatPhoneInput($('#orderPhone')));
-            $('#recvPhone').addEventListener('input', () => formatPhoneInput($('#recvPhone')));
-            $('#sameAsOrder').addEventListener('change', syncRecipientFromOrder);
-            $('#orderName').addEventListener('input', () => { if ($('#sameAsOrder').checked) copyRecipient(); });
-            $('#orderPhone').addEventListener('input', () => { if ($('#sameAsOrder').checked) copyRecipient(); });
-
-            // 프린트 버튼(모든 플랫폼 공통)
-            document.getElementById('btnPrint').onclick = () => { printInvoiceSafe(); };
-
-            // 이미지 저장 버튼 (PNG 1종, 더 깔끔한 렌더링)
-            document.getElementById('btnSaveImage').onclick = () => exportInvoicePNG();
-
-            render();
+<script>
+    // ===== 앱 동작(입력/장바구니/화면 렌더) =====
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+            navigator.serviceWorker.register('/sw.js').catch(console.error);
         });
-    </script>
+    }
 
-    <!-- 카카오 우편번호 -->
-    <script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
-    <script>
-        var element_wrap = document.getElementById('wrap');
-        function foldDaumPostcode() { element_wrap.style.display = 'none'; }
-        function sample3_execDaumPostcode() {
-            var currentScroll = Math.max(document.body.scrollTop, document.documentElement.scrollTop);
-            new daum.Postcode({
-                oncomplete: function (data) {
-                    var addr = '';
-                    var extraAddr = '';
-                    if (data.userSelectedType === 'R') { addr = data.roadAddress; }
-                    else { addr = data.jibunAddress; }
-                    if (data.userSelectedType === 'R') {
-                        if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) { extraAddr += data.bname; }
-                        if (data.buildingName !== '' && data.apartment === 'Y') {
-                            extraAddr += (extraAddr !== '' ? ', ' + data.buildingName : data.buildingName);
-                        }
-                        if (extraAddr !== '') { extraAddr = ' (' + extraAddr + ')'; }
-                        document.getElementById("sample3_extraAddress").value = extraAddr;
-                    } else {
-                        document.getElementById("sample3_extraAddress").value = '';
-                    }
-                    document.getElementById('sample3_postcode').value = data.zonecode;
-                    document.getElementById("sample3_address").value = addr;
-                    document.getElementById("sample3_detailAddress").focus();
-                    element_wrap.style.display = 'none';
-                    document.body.scrollTop = currentScroll;
-                },
-                onresize: function (size) { element_wrap.style.height = size.height + 'px'; },
-                width: '100%', height: '100%'
-            }).embed(element_wrap);
-            element_wrap.style.display = 'block';
+    const nf = new Intl.NumberFormat('ko-KR');
+    const $ = (s) => document.querySelector(s);
+
+    const items = new Map();
+    window.items = items;
+
+    const fmt = (n) => nf.format(Math.max(0, Number(n) || 0));
+
+    let products = {};
+    let dryNameSet = new Set();
+    const norm = (s) => (s || '').replace(/\s+/g, '').trim();
+    const isDryName = (name) => dryNameSet.has(norm(name));
+
+    async function loadProducts() {
+        const res = await fetch('/data/product.json', { cache: 'no-store' });
+        products = await res.json();
+        dryNameSet = new Set((products?.dry || []).map(p => norm(p.name)));
+    }
+
+    function updateMenuOptions(cat) {
+        const menu = $('#menu');
+        menu.innerHTML = '<option value="">상품 선택</option>';
+        if (products[cat]) {
+            products[cat].forEach(p => {
+                const opt = document.createElement('option');
+                opt.value = p.name;
+                opt.dataset.price = p.price;
+                opt.textContent = `${p.name} (${nf.format(p.price)}원)`;
+                menu.appendChild(opt);
+            });
         }
-    </script>
+    }
+
+    // 전화번호 포맷
+    function formatKRPhoneDigits(digits) {
+        digits = (digits || '').replace(/\D/g, '');
+        if (digits.startsWith('02')) {
+            if (digits.length <= 2) return digits;
+            if (digits.length <= 5) return digits.slice(0, 2) + '-' + digits.slice(2);
+            const mid = digits.length === 9 ? 3 : (digits.length - 6);
+            return digits.slice(0, 2) + '-' + digits.slice(2, 2 + mid) + '-' + digits.slice(2 + mid);
+        }
+        if (digits.length <= 3) return digits;
+        if (digits.length <= 7) return digits.slice(0, 3) + '-' + digits.slice(3);
+        if (digits.length <= 10) return digits.slice(0, 3) + '-' + digits.slice(3, 6) + '-' + digits.slice(6);
+        return digits.slice(0, 3) + '-' + digits.slice(3, 7) + '-' + digits.slice(7, 11);
+    }
+    const formatPhoneInput = (el) => el.value = formatKRPhoneDigits(el.value);
+
+    // 주문자와 동일
+    function copyRecipient() {
+        $('#recvName').value = $('#orderName').value;
+        $('#recvPhone').value = formatKRPhoneDigits($('#orderPhone').value);
+    }
+    function syncRecipientFromOrder() {
+        const checked = $('#sameAsOrder').checked;
+        if (checked) {
+            copyRecipient();
+            $('#recvName').readOnly = true;
+            $('#recvPhone').readOnly = true;
+        } else {
+            $('#recvName').readOnly = false;
+            $('#recvPhone').readOnly = false;
+        }
+    }
+
+    // 유리돔 규칙
+    const isGlassDome = (name) => typeof name === 'string' && name.includes('유리돔');
+    function enforceShippingRule() {
+        const hasGlassDome = [...items.keys()].some(isGlassDome);
+        const sel = $('#shipping');
+        const courier = sel.querySelector('option[value="택배"]');
+        if (hasGlassDome) {
+            if (courier) courier.disabled = true;
+            if (sel.value === '택배') {
+                sel.value = '방문 수령';
+                alert('유리돔은 파손 위험으로 방문 수령만 합니다. 배송방식을 방문 수령으로 변경했어요!.');
+            }
+        } else {
+            if (courier) courier.disabled = false;
+        }
+    }
+
+    // Dry 단일 선택
+    function hasDryInCart() { for (const k of items.keys()) if (isDryName(k)) return true; return false; }
+    function removeOtherDryLines(exceptName) {
+        for (const k of [...items.keys()]) if (isDryName(k) && norm(k) !== norm(exceptName)) items.delete(k);
+    }
+
+    function addOrIncItem(name, price, qty = 1) {
+        if (!name) return;
+        if (isDryName(name)) {
+            if (hasDryInCart() && !items.has(name)) alert('Dry 카테고리 상품은 한 종류만 선택할 수 있어 기존 항목을 교체합니다.');
+            removeOtherDryLines(name);
+        }
+        if (items.has(name)) items.get(name).qty += qty;
+        else items.set(name, { name, price: Number(price) || 0, qty: Number(qty) || 1 });
+        render();
+    }
+    function setQty(name, qty) {
+        const it = items.get(name); if (!it) return;
+        it.qty = Math.max(0, Number(qty) || 0);
+        if (it.qty === 0) items.delete(name);
+        render();
+    }
+    function removeItem(name) { items.delete(name); render(); }
+
+    function getTotals() {
+        let subtotal = 0;
+        items.forEach(it => subtotal += it.price * it.qty);
+        const shipOpt = $('#shipping').selectedOptions[0];
+        const shipFee = Number(shipOpt?.dataset?.fee) || 0;
+        const shipName = shipOpt?.value || '직접수령';
+        return { subtotal, shipFee, shipName, grand: subtotal + shipFee };
+    }
+
+    function render() {
+        enforceShippingRule();
+        const tbody = $('#itemsBody');
+        tbody.innerHTML = '';
+        items.forEach(it => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+      <td>${it.name}</td>
+      <td class="num">${fmt(it.price)}원</td>
+      <td>
+        <div style="display:flex;gap:6px;align-items:center;">
+          <button class="btn small" data-action="dec" data-name="${it.name}">-</button>
+          <input class="qtyInput" data-name="${it.name}" type="number" min="0" step="1" value="${it.qty}" style="width:50px" readonly/>
+          <button class="btn small" data-action="inc" data-name="${it.name}">+</button>
+        </div>
+      </td>
+      <td class="num">${fmt(it.price * it.qty)}원</td>
+      <td class="num"><button class="btn danger small" data-action="del" data-name="${it.name}">삭제</button></td>
+    `;
+            tbody.appendChild(tr);
+        });
+
+        tbody.onclick = (e) => {
+            const btn = e.target.closest('button'); if (!btn) return;
+            const name = btn.dataset.name; const it = items.get(name); if (!it) return;
+            if (btn.dataset.action === 'inc') setQty(name, it.qty + 1);
+            if (btn.dataset.action === 'dec') setQty(name, it.qty - 1);
+            if (btn.dataset.action === 'del') removeItem(name);
+        };
+
+        const { subtotal, shipFee, shipName, grand } = getTotals();
+        $('#subtotal').textContent = fmt(subtotal);
+        $('#shipFee').textContent = fmt(shipFee);
+        $('#shipName').textContent = shipName;
+        $('#grand').textContent = fmt(grand);
+        $('#sumSub').textContent = fmt(subtotal);
+        $('#sumShip').textContent = fmt(shipFee);
+
+        const cnt = [...items.values()].reduce((a, b) => a + b.qty, 0);
+        $('#summaryText').textContent = cnt ? `총 ${cnt}개 품목` : '항목이 없습니다';
+    }
+
+    // 통화 포맷
+    const curKR = (n) => '₩' + (new Intl.NumberFormat('ko-KR').format(Math.max(0, Number(n) || 0)));
+
+    // 출력 스타일(한 곳에서 관리)
+    function getInvoiceStyles() {
+        return `
+@page{size:A4 portrait;margin:12mm;}
+@media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+body{font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#0f172a;}
+/* 고정 폭: 화면 캡처 품질 일정 */
+.sheet{border:1px solid #e5e7eb;border-radius:12px;padding:14px; width:794px; margin:0 auto; background:#fff;}
+.topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+.brand{font-size:24px;font-weight:900;letter-spacing:.5px;}
+.tag{color:#ef4444;font-weight:900;letter-spacing:.5px;}
+.meta,.meta2{display:grid;gap:8px;margin:8px 0 14px;}
+.meta{grid-template-columns:1fr 1fr;}
+.meta2{grid-template-columns:1fr 1fr 1fr;}
+.box{border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;}
+.box h4{margin:0 0 6px;font-size:12px;color:#334155;letter-spacing:.2px;}
+.kv{display:grid;grid-template-columns:110px 1fr;row-gap:4px;column-gap:8px;}
+table{width:100%;border-collapse:collapse;}
+thead th{font-size:11px;color:#334155;text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;}
+tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+.num{text-align:right;white-space:nowrap;}
+.totals{border:1px solid #e2e8f0;border-radius:8px;padding:10px;}
+.totals .row{display:grid;grid-template-columns:1fr auto;padding:6px 0;border-bottom:1px dashed #e5e7eb;}
+.totals .row:last-child{border-bottom:0;font-weight:800;}
+.tiny{font-size:11px;color:#64748b;}
+`;
+    }
+
+    // 인보이스 데이터 채우기 + 문서제목/타임스탬프
+    function renderInvoice() {
+        const orderName = $('#orderName')?.value?.trim() || '-';
+        const orderPhone = $('#orderPhone')?.value?.trim() || '-';
+        const orderEmail = $('#orderEmail')?.value?.trim() || '-';
+
+        const recvName = $('#recvName')?.value?.trim() || orderName || '-';
+        const recvPhone = $('#recvPhone')?.value?.trim() || orderPhone || '-';
+        const addr = [
+            $('#sample3_postcode')?.value,
+            $('#sample3_address')?.value,
+            $('#sample3_detailAddress')?.value,
+            $('#sample3_extraAddress')?.value,
+        ].filter(Boolean).join(' ');
+
+        $('#invBillName').textContent = orderName;
+        $('#invBillPhone').textContent = orderPhone;
+        $('#invBillEmail').textContent = orderEmail;
+        $('#invShipName').textContent = recvName;
+        $('#invShipPhone').textContent = recvPhone;
+        $('#invShipAddr').textContent = addr || '-';
+
+        const memo = $('#memo')?.value?.trim();
+        $('#invNotes').textContent = memo || '-';
+        const shipSel = $('#shipping');
+        const shipName = shipSel?.selectedOptions[0]?.value || '방문 수령';
+        const shipFee = Number(shipSel?.selectedOptions[0]?.dataset?.fee) || 0;
+        $('#invPayMethod').textContent = shipName;
+
+        const tbody = $('#invItems');
+        tbody.innerHTML = '';
+        let sub = 0;
+        (window.items ? [...items.values()] : []).forEach(it => {
+            const amt = (Number(it.price) || 0) * (Number(it.qty) || 0);
+            sub += amt;
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+      <td>${it.name}</td>
+      <td class="num">${it.qty}</td>
+      <td class="num">${curKR(it.price)}</td>
+      <td class="num">${curKR(amt)}</td>
+    `;
+            tbody.appendChild(tr);
+        });
+        $('#invSub').textContent = curKR(sub);
+        $('#invShipFee').textContent = curKR(shipFee);
+        $('#invTotal').textContent = curKR(sub + shipFee);
+
+        // 신랑신부
+        $('#invGroomName').textContent = $('#groomName')?.value?.trim() || '-';
+        $('#invBrideName').textContent = $('#brideName')?.value?.trim() || '-';
+        $('#invEventDate').textContent = $('#eventDate')?.value?.trim() || '-';
+
+        // 상단 우측 현재 시간 & 파일명
+        const now = new Date(); const pad = (n) => String(n).padStart(2, '0');
+        const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
+        document.querySelector('#invoicePrint .tag').textContent = stamp;
+
+        const yy = String(now.getFullYear()).slice(2); const mm = pad(now.getMonth() + 1); const dd = pad(now.getDate());
+        const firstItem = (window.items && [...items.values()][0]?.name) || '상품없음';
+        document.title = `${yy}${mm}${dd}_${orderName || '이름없음'}_${firstItem}`;
+    }
+
+    // 출력용 HTML (PDF용 iframe 주입에서 사용)
+    function buildInvoiceHTML() {
+        renderInvoice();
+        const css = getInvoiceStyles();
+        return `
+<!doctype html><html lang="ko"><head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>${document.title}</title>
+  <style>html,body{margin:0;padding:0}${css}</style>
+</head><body>
+  ${document.querySelector('#invoicePrint').innerHTML}
+</body></html>`;
+    }
+
+    // 필요 함수 export
+    window.getInvoiceStyles = getInvoiceStyles;
+    window.renderInvoice = renderInvoice;
+    window.buildInvoiceHTML = buildInvoiceHTML;
+
+    // 이벤트 바인딩(출력 버튼 제외)
+    document.addEventListener('DOMContentLoaded', async () => {
+        await loadProducts();
+        $('#category').addEventListener('change', (e) => updateMenuOptions(e.target.value));
+        $('#menu').addEventListener('change', onMenuChange);
+        $('#shipping').addEventListener('change', render);
+        $('#clear').onclick = () => { items.clear(); render(); };
+
+        $('#orderPhone').addEventListener('input', () => formatPhoneInput($('#orderPhone')));
+        $('#recvPhone').addEventListener('input', () => formatPhoneInput($('#recvPhone')));
+        $('#sameAsOrder').addEventListener('change', syncRecipientFromOrder);
+        $('#orderName').addEventListener('input', () => { if ($('#sameAsOrder').checked) copyRecipient(); });
+        $('#orderPhone').addEventListener('input', () => { if ($('#sameAsOrder').checked) copyRecipient(); });
+
+        render();
+    });
+
+    // 내부용
+    function onMenuChange() {
+        const sel = $('#menu');
+        const opt = sel.selectedOptions[0];
+        const name = sel.value;
+        if (!name) return;
+
+        if (name === '직접입력') {
+            const n = (prompt('메뉴명을 입력하세요', '') || '').trim();
+            if (!n) { sel.value = ''; return; }
+            const p = Number(prompt('가격(원)을 입력하세요', '0'));
+            if (!Number.isFinite(p) || p < 0) { sel.value = ''; return; }
+            addOrIncItem(n, Math.round(p), 1);
+        } else {
+            addOrIncItem(name, Number(opt.dataset.price) || 0, 1);
+        }
+        sel.value = '';
+    }
+</script>
+
+<script>
+    // ===== 출력(PDF/이미지) 전용 =====
+
+    // PDF (프린트 다이얼로그)
+    function printInvoiceSafe() {
+        if (typeof window.buildInvoiceHTML !== 'function') {
+            alert('빌드 함수가 준비되지 않았어. 스크립트 로드 순서를 확인해줘.');
+            return;
+        }
+        const html = window.buildInvoiceHTML();
+
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;right:-10000px;bottom:-10000px;width:0;height:0;border:0';
+        iframe.setAttribute('sandbox', 'allow-modals allow-same-origin allow-scripts');
+        document.body.appendChild(iframe);
+
+        if ('srcdoc' in iframe) {
+            iframe.srcdoc = html;
+        } else {
+            const doc = iframe.contentWindow || iframe.contentDocument;
+            const idoc = doc.document || doc;
+            idoc.open(); idoc.write(html); idoc.close();
+        }
+
+        iframe.onload = () => {
+            try { iframe.contentWindow.focus(); iframe.contentWindow.print(); }
+            catch (e) { alert('이 기기에서 인쇄 대화상자를 열 수 없어요.'); }
+            finally { setTimeout(() => document.body.removeChild(iframe), 1500); }
+        };
+    }
+
+    // html2canvas 로더 (iframe 내부용으로도 씀)
+    function injectH2C(doc, onload) {
+        if (doc.defaultView.html2canvas) { onload(); return; }
+        const s = doc.createElement('script');
+        s.src = 'https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js';
+        s.onload = onload;
+        s.onerror = () => alert('html2canvas 로드 실패');
+        doc.head.appendChild(s);
+    }
+
+    // 이미지 다운로드(다운로드 미지원 브라우저 폴백 포함)
+    function downloadCanvas(canvas, filename) {
+        const a = document.createElement('a');
+        const supportDownload = 'download' in HTMLAnchorElement.prototype;
+        const isIOS = /iPad|iPhone|iPod/i.test(navigator.userAgent);
+        const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+
+        const doneURL = (url) => {
+            if (supportDownload && !isIOS && !isStandalone) {
+                a.href = url; a.download = filename;
+                document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            } else {
+                const w = window.open('', '_blank');
+                if (w && w.document) {
+                    w.document.write(`<!doctype html><title>${filename}</title>
+          <meta name="viewport" content="width=device-width, initial-scale=1">
+          <style>html,body{margin:0;background:#fff}img{display:block;max-width:100%;height:auto}</style>
+          <img src="${url}">`);
+                    w.document.close();
+                } else {
+                    window.location.href = url;
+                }
+            }
+        };
+
+        if (canvas.toBlob) {
+            canvas.toBlob((blob) => {
+                const url = URL.createObjectURL(blob);
+                doneURL(url);
+                setTimeout(() => URL.revokeObjectURL(url), 30000);
+            }, 'image/png');
+        } else {
+            doneURL(canvas.toDataURL('image/png'));
+        }
+    }
+
+    // ▶ 핵심: 프린트용 HTML을 iframe에 띄우고, 그 **iframe 안에서** 캡쳐
+    async function exportInvoiceImageFromIframe() {
+        if (typeof window.buildInvoiceHTML !== 'function') {
+            alert('출력용 데이터가 준비되지 않았어. 스크립트 로드 순서 확인해줘.');
+            return;
+        }
+
+        // 프린트용 HTML + html2canvas 주입
+        const html = window.buildInvoiceHTML().replace(
+            '</head>',
+            '<meta name="referrer" content="no-referrer"></head>'
+        );
+
+        const iframe = document.createElement('iframe');
+        iframe.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:0;height:0;border:0;';
+        iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts');
+        document.body.appendChild(iframe);
+
+        if ('srcdoc' in iframe) {
+            iframe.srcdoc = html;
+        } else {
+            const d = iframe.contentWindow || iframe.contentDocument;
+            const idoc = d.document || d;
+            idoc.open(); idoc.write(html); idoc.close();
+        }
+
+        await new Promise(resolve => iframe.onload = resolve);
+
+        const idoc = iframe.contentDocument;
+        const iwin = iframe.contentWindow;
+
+        // html2canvas 로딩 (iframe 내부)
+        await new Promise((res) => injectH2C(idoc, res));
+
+        const target = idoc.querySelector('.sheet') || idoc.body;
+        try { await idoc.fonts?.ready; } catch { }
+        // 레이아웃 확정
+        const w = Math.ceil(target.scrollWidth);
+        const h = Math.ceil(target.scrollHeight);
+        iframe.style.width = w + 'px';
+        iframe.style.height = h + 'px';
+        idoc.documentElement.style.width = w + 'px';
+        idoc.documentElement.style.height = h + 'px';
+        idoc.body.style.width = w + 'px';
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        const scale = Math.min(3, (window.devicePixelRatio || 1) * 2);
+        const canvas = await iwin.html2canvas(target, {
+            backgroundColor: '#ffffff',
+            scale,
+            useCORS: true,
+            allowTaint: true,
+            scrollX: 0,
+            scrollY: 0,
+            windowWidth: w,
+            windowHeight: h,
+        });
+
+        downloadCanvas(canvas, `${document.title || 'flovin_invoice'}.png`);
+        document.body.removeChild(iframe);
+    }
+
+    // 바인딩 (중복 방지: 한 번만)
+    document.addEventListener('DOMContentLoaded', () => {
+        const btnImg = document.getElementById('btnSaveImage');
+        const btnPdf = document.getElementById('btnPrint');
+        if (btnImg) btnImg.addEventListener('click', (e) => { e.preventDefault(); exportInvoiceImageFromIframe(); }, { passive: false });
+        if (btnPdf) btnPdf.addEventListener('click', (e) => { e.preventDefault(); printInvoiceSafe(); }, { passive: false });
+
+        // date input이 미지원 브라우저 대비 포맷 강제
+        const d = document.getElementById('eventDate');
+        if (d && d.type !== 'date') {
+            d.placeholder = '2025-01-01';
+            d.addEventListener('input', () => {
+                let v = d.value.replace(/\D/g, '').slice(0, 8);
+                if (v.length >= 4) v = v.slice(0, 4) + '-' + v.slice(4);
+                if (v.length >= 7) v = v.slice(0, 7) + '-' + v.slice(7);
+                d.value = v;
+            });
+        }
+    });
+
+    // 전역 export (원하면 HTML에서 호출 가능)
+    window.printInvoiceSafe = printInvoiceSafe;
+    window.exportInvoiceImage = exportInvoiceImageFromIframe;
+</script>
+
+
+
+<!-- 카카오 우편번호 -->
+<script src="https://t1.daumcdn.net/mapjsapi/bundle/postcode/prod/postcode.v2.js"></script>
+<script>
+    var element_wrap = document.getElementById('wrap');
+    function foldDaumPostcode() { element_wrap.style.display = 'none'; }
+    function sample3_execDaumPostcode() {
+        var currentScroll = Math.max(document.body.scrollTop, document.documentElement.scrollTop);
+        new daum.Postcode({
+            oncomplete: function (data) {
+                var addr = '';
+                var extraAddr = '';
+                if (data.userSelectedType === 'R') { addr = data.roadAddress; }
+                else { addr = data.jibunAddress; }
+                if (data.userSelectedType === 'R') {
+                    if (data.bname !== '' && /[동|로|가]$/g.test(data.bname)) { extraAddr += data.bname; }
+                    if (data.buildingName !== '' && data.apartment === 'Y') {
+                        extraAddr += (extraAddr !== '' ? ', ' + data.buildingName : data.buildingName);
+                    }
+                    if (extraAddr !== '') { extraAddr = ' (' + extraAddr + ')'; }
+                    document.getElementById("sample3_extraAddress").value = extraAddr;
+                } else {
+                    document.getElementById("sample3_extraAddress").value = '';
+                }
+                document.getElementById('sample3_postcode').value = data.zonecode;
+                document.getElementById("sample3_address").value = addr;
+                document.getElementById("sample3_detailAddress").focus();
+                element_wrap.style.display = 'none';
+                document.body.scrollTop = currentScroll;
+            },
+            onresize: function (size) { element_wrap.style.height = size.height + 'px'; },
+            width: '100%', height: '100%'
+        }).embed(element_wrap);
+        element_wrap.style.display = 'block';
+    }
+</script>
 </body>
 
 </html>
