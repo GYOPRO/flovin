@@ -192,10 +192,8 @@
         </div>
 
         <div class="actions" style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap;">
-            <button class="btn" id="btnPrint">인쇄 / PDF 저장</button>
-            <!-- 새로 추가: PNG/JPG 저장 버튼 -->
-            <button class="btn" id="btnSavePNG" title="출력 화면을 PNG로 저장">이미지 저장(PNG)</button>
-            <button class="btn" id="btnSaveJPG" title="출력 화면을 JPG로 저장">이미지 저장(JPG)</button>
+            <button class="btn" id="btnPrint">PDF 저장</button>
+            <button class="btn" id="btnSaveImage">이미지 저장</button>
         </div>
     </div>
 
@@ -440,18 +438,18 @@
             items.forEach(it => {
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                <td>${it.name}</td>
-                <td class="num">${fmt(it.price)}원</td>
-                <td>
-                <div style="display:flex;gap:6px;align-items:center;">
-                    <button class="btn small" data-action="dec" data-name="${it.name}">-</button>
-                    <input class="qtyInput" data-name="${it.name}" type="number" min="0" step="1" value="${it.qty}" style="width:50px" readonly/>
-                    <button class="btn small" data-action="inc" data-name="${it.name}">+</button>
-                </div>
-                </td>
-                <td class="num">${fmt(it.price * it.qty)}원</td>
-                <td class="num"><button class="btn danger small" data-action="del" data-name="${it.name}">삭제</button></td>
-            `;
+          <td>${it.name}</td>
+          <td class="num">${fmt(it.price)}원</td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center;">
+              <button class="btn small" data-action="dec" data-name="${it.name}">-</button>
+              <input class="qtyInput" data-name="${it.name}" type="number" min="0" step="1" value="${it.qty}" style="width:50px" readonly/>
+              <button class="btn small" data-action="inc" data-name="${it.name}">+</button>
+            </div>
+          </td>
+          <td class="num">${fmt(it.price * it.qty)}원</td>
+          <td class="num"><button class="btn danger small" data-action="del" data-name="${it.name}">삭제</button></td>
+        `;
                 tbody.appendChild(tr);
             });
 
@@ -574,7 +572,7 @@
         .sheet{border:1px solid #e5e7eb;border-radius:12px;padding:14px; width:794px; margin:0 auto; background:#fff;}
         .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
         .brand{font-size:24px;font-weight:900;letter-spacing:.5px;}
-        .tag{font-weight:900;letter-spacing:.5px;}
+        .tag{color:#ef4444;font-weight:900;letter-spacing:.5px;}
         .meta,.meta2{display:grid;gap:8px;margin:8px 0 14px;}
         .meta{grid-template-columns:1fr 1fr;}
         .meta2{grid-template-columns:1fr 1fr 1fr;}
@@ -598,15 +596,6 @@
         </head><body>
             ${document.querySelector('#invoicePrint').innerHTML}
         </body></html>`;
-        }
-
-        // 이미지 저장용 HTML (iframe 안에서 html2canvas 로드)
-        function buildInvoiceHTMLForImage() {
-            const html = buildInvoiceHTML();
-            // html2canvas를 iframe 안에서 로드하기 위해 스크립트 태그 주입
-            return html.replace('</head>',
-                '<script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"><\/script>\n</head>'
-            );
         }
 
         // ⭐ 갤럭시/안드로이드 안전 프린트: 숨은 iframe 사용 (사용자 제스처 유지)
@@ -644,103 +633,82 @@
             };
         }
 
-        // ⭐ 새로 추가: iframe에서 출력 HTML을 캔버스로 캡처 후 PNG/JPG로 저장
-        async function saveInvoiceImageViaIframe(type = 'png') {
-            // 버튼 중복 클릭 방지
-            const btnPNG = document.getElementById('btnSavePNG');
-            const btnJPG = document.getElementById('btnSaveJPG');
-            btnPNG?.setAttribute('disabled', 'disabled');
-            btnJPG?.setAttribute('disabled', 'disabled');
-
-            const cleanup = (iframe) => setTimeout(() => {
-                try { document.body.removeChild(iframe); } catch { }
-                btnPNG?.removeAttribute('disabled');
-                btnJPG?.removeAttribute('disabled');
-            }, 100);
-
+        // ⭐ 새로 추가: 외부 라이브러리 없이 SVG foreignObject로 깨끗한 PNG 내보내기
+        async function exportInvoicePNG() {
             try {
-                const html = buildInvoiceHTMLForImage();
-                            console.log(html);
-                const iframe = document.createElement('iframe');
-                iframe.style.position = 'fixed';
-                iframe.style.right = '0';
-                iframe.style.bottom = '0';
-                iframe.style.width = '0';
-                iframe.style.height = '0';
-                iframe.style.border = '0';
-                iframe.setAttribute('sandbox', 'allow-same-origin allow-scripts');
-                document.body.appendChild(iframe);
+                renderInvoice();
+                // 1) 출력용 CSS (buildInvoiceHTML과 동일 폭/스타일)
+                const css = `
+        @page{size:A4 portrait;margin:12mm;}
+        @media print { html, body { -webkit-print-color-adjust: exact; print-color-adjust: exact; } }
+        html,body{margin:0;padding:0}
+        body{font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial;color:#0f172a;background:#fff;}
+        .sheet{border:1px solid #e5e7eb;border-radius:12px;padding:14px; width:794px; margin:0 auto; background:#fff;}
+        .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
+        .brand{font-size:24px;font-weight:900;letter-spacing:.5px;}
+        .tag{color:#ef4444;font-weight:900;letter-spacing:.5px;}
+        .meta,.meta2{display:grid;gap:8px;margin:8px 0 14px;}
+        .meta{grid-template-columns:1fr 1fr;}
+        .meta2{grid-template-columns:1fr 1fr 1fr;}
+        .box{border:1px solid #e2e8f0;border-radius:8px;padding:10px;background:#fff;}
+        .box h4{margin:0 0 6px;font-size:12px;color:#334155;letter-spacing:.2px;}
+        .kv{display:grid;grid-template-columns:110px 1fr;row-gap:4px;column-gap:8px;}
+        table{width:100%;border-collapse:collapse;}
+        thead th{font-size:11px;color:#334155;text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;}
+        tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
+        .num{text-align:right;white-space:nowrap;}
+        .totals{border:1px solid #e2e8f0;border-radius:8px;padding:10px;}
+        .totals .row{display:grid;grid-template-columns:1fr auto;padding:6px 0;border-bottom:1px dashed #e5e7eb;}
+        .totals .row:last-child{border-bottom:0;font-weight:800;}
+        .tiny{font-size:11px;color:#64748b;}
+        `;
 
-                if ('srcdoc' in iframe) {
-                    iframe.srcdoc = html;
-                } else {
-                    const doc = iframe.contentWindow || iframe.contentDocument;
-                    const idoc = doc.document || doc;
-                    idoc.open(); idoc.write(html); idoc.close();
-                }
+                // 2) 화면 밖에서 실제 렌더 높이를 먼저 계산
+                const ghost = document.createElement('div');
+                ghost.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:794px;visibility:hidden;';
+                ghost.innerHTML = `<style>${css}</style>${document.querySelector('#invoicePrint').innerHTML}`;
+                document.body.appendChild(ghost);
+                const h = Math.ceil(ghost.querySelector('.sheet').getBoundingClientRect().height);
+                const w = 794;
 
-                iframe.onload = async () => {
-                    try {
-                        const idoc = iframe.contentDocument;
-                        const win = iframe.contentWindow;
+                // 3) SVG foreignObject로 HTML을 이미지로 변환 (폰트/라인 가장 깔끔)
+                const svg = `<?xml version="1.0" encoding="UTF-8"?>
+`+
+                    `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">` +
+                    `<foreignObject width="100%" height="100%">` +
+                    `<div xmlns="http://www.w3.org/1999/xhtml"><style>${css}</style><div class="sheet">${document.querySelector('#invoicePrint').innerHTML}</div></div>` +
+                    `</foreignObject></svg>`;
 
-                        // html2canvas 로드 확인
-                        const h2c = win.html2canvas;
-                        if (typeof h2c !== 'function') {
-                            alert('html2canvas 로딩에 실패했어. 네트워크를 확인해줘.');
-                            return cleanup(iframe);
-                        }
+                const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+                const url = URL.createObjectURL(blob);
+                const img = new Image();
+                const scale = Math.min(3, (window.devicePixelRatio || 1) * 2);
 
-                        // 캡처 대상: 첫 번째 .sheet
-                        const target = idoc.querySelector('.sheet') || idoc.body;
+                await new Promise((resolve, reject) => {
+                    img.onload = () => resolve();
+                    img.onerror = reject;
+                    img.src = url;
+                });
 
-                        // viewport 보정: iframe/문서 크기를 캡쳐 대상에 맞춤(오른쪽 잘림 방지)
-                        let w = Math.ceil(target.scrollWidth + 2); // 여유 픽셀
-                        let h = Math.ceil(target.scrollHeight + 2);
-                        iframe.style.width = w + 'px';
-                        iframe.style.height = h + 'px';
-                        idoc.documentElement.style.width = w + 'px';
-                        idoc.documentElement.style.height = h + 'px';
-                        idoc.body.style.width = w + 'px';
-                        idoc.body.style.height = 'auto';
+                const canvas = document.createElement('canvas');
+                canvas.width = w * scale;
+                canvas.height = h * scale;
+                const ctx = canvas.getContext('2d');
+                ctx.setTransform(scale, 0, 0, scale, 0, 0);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, w, h);
+                ctx.drawImage(img, 0, 0);
 
-                        // 레이아웃 안정화 대기
-                        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+                URL.revokeObjectURL(url);
+                document.body.removeChild(ghost);
 
-                        const scale = Math.min(3, (window.devicePixelRatio || 1) * 2); // 과도한 메모리 방지
-                        const canvas = await h2c(target, {
-                            backgroundColor: '#ffffff',
-                            scale,
-                            useCORS: true,
-                            allowTaint: true,
-                            scrollX: 0,
-                            scrollY: 0,
-                            windowWidth: w,
-                            windowHeight: h,
-                        });
-
-                        const mime = (type === 'jpg' || type === 'jpeg') ? 'image/jpeg' : 'image/png';
-                        const quality = (mime === 'image/jpeg') ? 0.92 : 1.0;
-                        const dataURL = canvas.toDataURL(mime, quality);
-
-                        const a = document.createElement('a');
-                        const ext = (mime === 'image/jpeg') ? 'jpg' : 'png';
-                        // 파일명: 기존 document.title 사용
-                        a.download = `${document.title || 'flovin_invoice'}.${ext}`;
-                        a.href = dataURL;
-                        a.click();
-                    } catch (err) {
-                        console.error(err);
-                        alert('이미지 저장 중 오류가 발생했어.');
-                    } finally {
-                        cleanup(iframe);
-                    }
-                };
+                const a = document.createElement('a');
+                a.download = `${document.title || 'flovin_invoice'}.png`;
+                a.href = canvas.toDataURL('image/png');
+                a.click();
             } catch (e) {
                 console.error(e);
-                alert('이미지 저장을 시작할 수 없었어.');
-                btnPNG?.removeAttribute('disabled');
-                btnJPG?.removeAttribute('disabled');
+                alert('이미지 변환에 실패했어.');
             }
         }
 
@@ -761,9 +729,8 @@
             // 프린트 버튼(모든 플랫폼 공통)
             document.getElementById('btnPrint').onclick = () => { printInvoiceSafe(); };
 
-            // 새로 추가: PNG/JPG 저장 버튼
-            document.getElementById('btnSavePNG').onclick = () => saveInvoiceImageViaIframe('png');
-            document.getElementById('btnSaveJPG').onclick = () => saveInvoiceImageViaIframe('jpg');
+            // 이미지 저장 버튼 (PNG 1종, 더 깔끔한 렌더링)
+            document.getElementById('btnSaveImage').onclick = () => exportInvoicePNG();
 
             render();
         });
