@@ -513,7 +513,6 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 .totals{border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-top:10px;}
 .totals .row{display:grid;grid-template-columns:1fr auto;padding:6px 0;border-bottom:1px dashed #e5e7eb;}
 .totals .row:last-child{border-bottom:0;font-weight:800;}
-.tiny{font-size:11px;color:#64748b;}
 `;
     }
 
@@ -655,9 +654,9 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 </script>
 
 <script>
-    // ===== 출력(PDF/이미지) 전용 =====
+    /* ===== 출력(PDF/이미지) 전용 — 교체본 ===== */
 
-    // PDF (기존 그대로 사용)
+    // PDF (프린트 다이얼로그)
     function printInvoiceSafe() {
         if (typeof window.buildInvoiceHTML !== 'function') {
             alert('빌드 함수가 준비되지 않았어. 스크립트 로드 순서를 확인해줘.');
@@ -681,7 +680,12 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
         };
     }
 
-    // html2canvas 로더 (전역)
+    // 브라우저 감지 (iOS/Safari 판별)
+    const UA = navigator.userAgent;
+    const isIOS = /iPad|iPhone|iPod/.test(UA) || (/\bMac\b/.test(navigator.platform || '') && navigator.maxTouchPoints > 1);
+    const isSafari = /^((?!chrome|android|crios|fxios|edgios|edg).)*safari/i.test(UA);
+
+    // html2canvas 로더 (필요 시)
     function ensureH2C() {
         if (window.html2canvas) return Promise.resolve();
         return new Promise((res, rej) => {
@@ -692,23 +696,20 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
         });
     }
 
-    // iOS/PWA 친화 공유/다운로드
+    // 공유/다운로드 (iOS 고려)
     async function shareOrDownload(canvas, filename) {
-        // 가능한 한 파일 공유(iOS 사파리 16+)
         try {
             const blob = await new Promise(r => canvas.toBlob(r, 'image/png'));
             if (blob && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: 'image/png' })] })) {
                 await navigator.share({ files: [new File([blob], filename, { type: 'image/png' })], title: filename });
                 return;
             }
-            // 일반 다운로드
             const a = document.createElement('a');
-            const url = URL.createObjectURL(blob || new Blob([canvas.toDataURL('image/png')], { type: 'text/plain' }));
+            const url = URL.createObjectURL(blob);
             a.href = url; a.download = filename;
             document.body.appendChild(a); a.click(); document.body.removeChild(a);
             setTimeout(() => URL.revokeObjectURL(url), 30000);
         } catch {
-            // 최후: 새 탭으로 열기 (iOS/PWA에서 길게 눌러 저장)
             const dataURL = canvas.toDataURL('image/png');
             const w = window.open('', '_blank');
             if (w && w.document) {
@@ -723,28 +724,71 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
         }
     }
 
-    // ▶ iOS에서도 빈화면 안 나오게: 현재 문서 안에 "보이진 않지만 뷰포트 안"에 클론을 놓고 캡쳐
-    async function exportInvoiceImage() {
+    /* ---------- 경로 A: foreignObject (고화질, 비-Safari 권장) ---------- */
+    async function exportViaForeignObject() {
+        if (isSafari) throw new Error('Safari에서는 FO 비활성'); // 사파리 비권장
         if (typeof window.renderInvoice !== 'function' || typeof window.getInvoiceStyles !== 'function') {
-            alert('출력용 데이터가 준비되지 않았어. 스크립트 로드 순서를 확인해줘.');
-            return;
+            throw new Error('빌드 함수 없음');
         }
 
-        await ensureH2C();
         window.renderInvoice();
+        const css = window.getInvoiceStyles();
+        const w = 794;
 
+        // 실제 높이 측정 (고스트 DOM)
+        const ghost = document.createElement('div');
+        ghost.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:794px;visibility:hidden;background:#fff;';
+        ghost.innerHTML = `<style>${css}</style>${document.querySelector('#invoicePrint').innerHTML}`;
+        document.body.appendChild(ghost);
+        const h = Math.ceil((ghost.querySelector('.sheet') || ghost).getBoundingClientRect().height || 1123); // A4 약 1123px(96dpi)
+        document.body.removeChild(ghost);
+
+        // SVG + foreignObject
+        const svg = `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">
+  <foreignObject width="100%" height="100%">
+    <div xmlns="http://www.w3.org/1999/xhtml">
+      <style>${css}</style>
+      ${document.querySelector('#invoicePrint').innerHTML}
+    </div>
+  </foreignObject>
+</svg>`;
+
+        const blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const img = new Image();
+        await new Promise((ok, err) => { img.onload = ok; img.onerror = err; img.src = url; });
+
+        const scale = Math.min(3, (window.devicePixelRatio || 1) * 2);
+        const canvas = document.createElement('canvas');
+        canvas.width = w * scale;
+        canvas.height = h * scale;
+        const ctx = canvas.getContext('2d');
+        ctx.setTransform(scale, 0, 0, scale, 0, 0);
+        ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0);
+        URL.revokeObjectURL(url);
+
+        await shareOrDownload(canvas, `${document.title || 'flovin_invoice'}.png`);
+    }
+
+    /* ---------- 경로 B1: html2canvas (iOS/Safari용 — 뷰포트 안) ---------- */
+    async function exportViaH2C_iOS() {
+        await ensureH2C();
+        if (typeof window.renderInvoice !== 'function' || typeof window.getInvoiceStyles !== 'function') {
+            throw new Error('빌드 함수 없음');
+        }
+
+        window.renderInvoice();
         const css = window.getInvoiceStyles();
 
-        // 캡쳐용 호스트(뷰포트 (0,0)에 두고 opacity로만 숨김) — iOS에서 중요
+        // 뷰포트 (0,0)에 반투명으로 두어 실제 렌더되게 함 (iOS blank 방지)
         const host = document.createElement('div');
-        host.style.cssText = `
-    position:fixed; left:0; top:0; width:794px; background:#fff;
-    opacity:.01; pointer-events:none; z-index:-1; transform:translateZ(0);`;
+        host.style.cssText = 'position:fixed;left:0;top:0;width:794px;background:#fff;opacity:.01;pointer-events:none;z-index:9999;transform:translateZ(0);';
         host.innerHTML = `<style>${css}</style>${document.querySelector('#invoicePrint').innerHTML}`;
         document.body.appendChild(host);
 
         const target = host.querySelector('.sheet') || host;
-
         try { await document.fonts?.ready; } catch { }
         await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
@@ -763,14 +807,75 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
         document.body.removeChild(host);
     }
 
-    // 버튼 바인딩
+    /* ---------- 경로 B2: html2canvas (그 외 — 화면 밖 고스트) ---------- */
+    async function exportViaH2C_ghost() {
+        await ensureH2C();
+        if (typeof window.renderInvoice !== 'function' || typeof window.getInvoiceStyles !== 'function') {
+            throw new Error('빌드 함수 없음');
+        }
+
+        window.renderInvoice();
+        const css = window.getInvoiceStyles();
+
+        const ghost = document.createElement('div');
+        ghost.style.cssText = 'position:fixed;left:-10000px;top:-10000px;width:794px;background:#fff;visibility:hidden;';
+        ghost.innerHTML = `<style>${css}</style>${document.querySelector('#invoicePrint').innerHTML}`;
+        document.body.appendChild(ghost);
+
+        const target = ghost.querySelector('.sheet') || ghost;
+        try { await document.fonts?.ready; } catch { }
+        await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+        const scale = Math.min(3, (window.devicePixelRatio || 1) * 2);
+        const canvas = await window.html2canvas(target, {
+            backgroundColor: '#ffffff',
+            scale,
+            useCORS: true,
+            allowTaint: true,
+            scrollX: 0, scrollY: 0,
+            windowWidth: Math.ceil(target.scrollWidth),
+            windowHeight: Math.ceil(target.scrollHeight),
+        });
+
+        await shareOrDownload(canvas, `${document.title || 'flovin_invoice'}.png`);
+        document.body.removeChild(ghost);
+    }
+
+    /* ---------- 통합 진입점 ---------- */
+    async function exportInvoiceImage() {
+        try {
+            // 1) 비-사파리 브라우저에서 foreignObject 우선 시도 (윈도우/안드로이드 고화질)
+            if (!isSafari) {
+                await exportViaForeignObject();
+                return;
+            }
+            // 2) 사파리/아이오에스는 html2canvas iOS 경로
+            await exportViaH2C_iOS();
+        } catch (e1) {
+            // 3) 최종 폴백: 일반 html2canvas 고스트
+            try {
+                await exportViaH2C_ghost();
+            } catch (e2) {
+                console.error('이미지 변환 실패', e1, e2);
+                alert('이미지 변환에 실패했어.');
+            }
+        }
+    }
+
+    // 버튼 바인딩(중복 방지)
     document.addEventListener('DOMContentLoaded', () => {
         const btnImg = document.getElementById('btnSaveImage');
         const btnPdf = document.getElementById('btnPrint');
-        if (btnImg) btnImg.addEventListener('click', (e) => { e.preventDefault(); exportInvoiceImage(); }, { passive: false });
-        if (btnPdf) btnPdf.addEventListener('click', (e) => { e.preventDefault(); printInvoiceSafe(); }, { passive: false });
+        if (btnImg && !btnImg.dataset.bound) {
+            btnImg.addEventListener('click', (e) => { e.preventDefault(); exportInvoiceImage(); }, { passive: false });
+            btnImg.dataset.bound = '1';
+        }
+        if (btnPdf && !btnPdf.dataset.bound) {
+            btnPdf.addEventListener('click', (e) => { e.preventDefault(); printInvoiceSafe(); }, { passive: false });
+            btnPdf.dataset.bound = '1';
+        }
 
-        // 어디를 눌러도 달력 오픈 (지원 브라우저에서 showPicker 사용)
+        // 어디를 눌러도 달력 오픈 (지원 브라우저에서 showPicker)
         const dateBox = document.querySelector('.date-field');
         if (dateBox) {
             dateBox.addEventListener('click', () => {
@@ -782,7 +887,7 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
         }
     });
 
-    // 전역 노출(원하면 HTML 속성으로도 호출 가능)
+    // 전역 노출
     window.printInvoiceSafe = printInvoiceSafe;
     window.exportInvoiceImage = exportInvoiceImage;
 </script>
