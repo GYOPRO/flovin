@@ -14,6 +14,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="FLOVIN">
     <link rel="apple-touch-icon" href="/icons/icon-192.png">
+
+    <!-- 파일 저장용 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 </head>
 
 <body>
@@ -193,6 +197,8 @@
 
         <div class="actions" style="margin-top:12px;">
             <button class="btn" id="btnPrint">인쇄 / PDF 저장</button>
+            <button class="btn" id="btnPDFFile">PDF 파일 저장</button>
+            <button class="btn" id="btnIMGFile">이미지 저장(PNG)</button>
         </div>
     </div>
 
@@ -633,6 +639,120 @@
             };
         }
 
+        /* =========================
+           ▼ 파일로 저장(PDF/PNG)
+           ========================= */
+        function getBaseFilename() {
+            const pad = (n) => String(n).padStart(2, '0');
+            const now = new Date();
+            const yy = String(now.getFullYear()).slice(2);
+            const mm = pad(now.getMonth() + 1);
+            const dd = pad(now.getDate());
+            const orderName = (document.querySelector('#orderName')?.value?.trim()) || '이름없음';
+            const firstItem = (window.items && [...items.values()][0]?.name) || '상품없음';
+            return `${yy}${mm}${dd}_${orderName}_${firstItem}`;
+        }
+        const ensureInvoiceReady = () => { if (typeof renderInvoice === 'function') renderInvoice(); };
+
+        function downloadDataURL(dataURL, filename) {
+            const a = document.createElement('a');
+            a.href = dataURL;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+        async function dataURLToBlob(dataURL) {
+            const res = await fetch(dataURL);
+            return await res.blob();
+        }
+        async function tryShareOrDownload(blob, filename) {
+            const file = new File([blob], filename, { type: blob.type });
+            if (navigator.share && navigator.canShare?.({ files: [file] })) {
+                try {
+                    await navigator.share({ files: [file], title: filename });
+                    return;
+                } catch (e) { /* fallthrough */ }
+            }
+            const url = URL.createObjectURL(blob);
+            downloadDataURL(url, filename);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+        }
+
+        const CAPTURE_OPTS = { scale: 2, useCORS: true, backgroundColor: '#ffffff' };
+
+        async function exportInvoiceAsImage() {
+            ensureInvoiceReady();
+            const sheet = document.querySelector('#invoicePrint .sheet');
+            const prev = {
+                position: sheet.style.position, left: sheet.style.left, top: sheet.style.top,
+                zIndex: sheet.style.zIndex, opacity: sheet.style.opacity
+            };
+            const needHack = getComputedStyle(sheet).display === 'none' || sheet.offsetParent === null;
+            if (needHack) {
+                sheet.style.position = 'fixed'; sheet.style.left = '-10000px'; sheet.style.top = '0';
+                sheet.style.zIndex = '-1'; sheet.style.opacity = '1';
+            }
+            try {
+                const canvas = await html2canvas(sheet, CAPTURE_OPTS);
+                const dataURL = canvas.toDataURL('image/png');
+                const blob = await dataURLToBlob(dataURL);
+                await tryShareOrDownload(blob, `${getBaseFilename()}.png`);
+            } finally {
+                if (needHack) {
+                    sheet.style.position = prev.position; sheet.style.left = prev.left; sheet.style.top = prev.top;
+                    sheet.style.zIndex = prev.zIndex; sheet.style.opacity = prev.opacity;
+                }
+            }
+        }
+
+        async function exportInvoiceAsPDF() {
+            ensureInvoiceReady();
+            const sheet = document.querySelector('#invoicePrint .sheet');
+            const prev = {
+                position: sheet.style.position, left: sheet.style.left, top: sheet.style.top,
+                zIndex: sheet.style.zIndex, opacity: sheet.style.opacity
+            };
+            const needHack = getComputedStyle(sheet).display === 'none' || sheet.offsetParent === null;
+            if (needHack) {
+                sheet.style.position = 'fixed'; sheet.style.left = '-10000px'; sheet.style.top = '0';
+                sheet.style.zIndex = '-1'; sheet.style.opacity = '1';
+            }
+            try {
+                const canvas = await html2canvas(sheet, CAPTURE_OPTS);
+                const imgData = canvas.toDataURL('image/jpeg', 0.95);
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+                const pageWidth = pdf.internal.pageSize.getWidth();
+                const pageHeight = pdf.internal.pageSize.getHeight();
+                const imgWidth = pageWidth;
+                const imgHeight = canvas.height * imgWidth / canvas.width;
+
+                if (imgHeight <= pageHeight) {
+                    pdf.addImage(imgData, 'JPEG', 0, 0, imgWidth, imgHeight, undefined, 'FAST');
+                } else {
+                    let heightLeft = imgHeight;
+                    let position = 0;
+                    while (heightLeft > 0) {
+                        pdf.addImage(imgData, 'JPEG', 0, position, imgWidth, imgHeight, undefined, 'FAST');
+                        heightLeft -= pageHeight;
+                        if (heightLeft > 0) {
+                            pdf.addPage();
+                            position = -(imgHeight - heightLeft);
+                        }
+                    }
+                }
+
+                const pdfBlob = pdf.output('blob');
+                await tryShareOrDownload(pdfBlob, `${getBaseFilename()}.pdf`);
+            } finally {
+                if (needHack) {
+                    sheet.style.position = prev.position; sheet.style.left = prev.left; sheet.style.top = prev.top;
+                    sheet.style.zIndex = prev.zIndex; sheet.style.opacity = prev.opacity;
+                }
+            }
+        }
+
         // 이벤트 바인딩
         document.addEventListener('DOMContentLoaded', async () => {
             await loadProducts();
@@ -647,8 +767,11 @@
             $('#orderName').addEventListener('input', () => { if ($('#sameAsOrder').checked) copyRecipient(); });
             $('#orderPhone').addEventListener('input', () => { if ($('#sameAsOrder').checked) copyRecipient(); });
 
-            // 프린트 버튼(모든 플랫폼 공통)
+            // 프린트(시스템 프린트 대화상자)
             document.getElementById('btnPrint').onclick = () => { printInvoiceSafe(); };
+            // 파일 저장(PDF/PNG)
+            document.getElementById('btnPDFFile').onclick = () => { exportInvoiceAsPDF(); };
+            document.getElementById('btnIMGFile').onclick = () => { exportInvoiceAsImage(); };
 
             render();
         });
