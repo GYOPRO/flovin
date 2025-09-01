@@ -483,7 +483,7 @@ body{font:12px/1.45 ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvet
 .sheet{border:1px solid #e5e7eb;border-radius:12px;padding:14px; width:794px; margin:0 auto; background:#fff;}
 .topbar{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12px;}
 .brand{font-size:24px;font-weight:900;letter-spacing:.5px;}
-.tag{color:#ef4444;font-weight:900;letter-spacing:.5px;}
+.tag{font-weight:900;letter-spacing:.5px;}
 .meta,.meta2{display:grid;gap:8px;margin:8px 0 14px;}
 .meta{grid-template-columns:1fr 1fr;}
 .meta2{grid-template-columns:1fr 1fr 1fr;}
@@ -494,13 +494,14 @@ table{width:100%;border-collapse:collapse;}
 thead th{font-size:11px;color:#334155;text-align:left;padding:8px;border-bottom:1px solid #e2e8f0;}
 tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
 .num{text-align:right;white-space:nowrap;}
-.totals{border:1px solid #e2e8f0;border-radius:8px;padding:10px;}
+.totals{border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-top:10px;}
 .totals .row{display:grid;grid-template-columns:1fr auto;padding:6px 0;border-bottom:1px dashed #e5e7eb;}
 .totals .row:last-child{border-bottom:0;font-weight:800;}
 .tiny{font-size:11px;color:#64748b;}
 `;
     }
 
+    // 인보이스 데이터 채우기 + 문서제목/타임스탬프
     // 인보이스 데이터 채우기 + 문서제목/타임스탬프
     function renderInvoice() {
         const orderName = $('#orderName')?.value?.trim() || '-';
@@ -530,6 +531,7 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
         const shipFee = Number(shipSel?.selectedOptions[0]?.dataset?.fee) || 0;
         $('#invPayMethod').textContent = shipName;
 
+        // 아이템 테이블
         const tbody = $('#invItems');
         tbody.innerHTML = '';
         let sub = 0;
@@ -538,11 +540,11 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
             sub += amt;
             const tr = document.createElement('tr');
             tr.innerHTML = `
-      <td>${it.name}</td>
-      <td class="num">${it.qty}</td>
-      <td class="num">${curKR(it.price)}</td>
-      <td class="num">${curKR(amt)}</td>
-    `;
+            <td>${it.name}</td>
+            <td class="num">${it.qty}</td>
+            <td class="num">${curKR(it.price)}</td>
+            <td class="num">${curKR(amt)}</td>
+            `;
             tbody.appendChild(tr);
         });
         $('#invSub').textContent = curKR(sub);
@@ -555,14 +557,31 @@ tbody td{padding:8px;border-bottom:1px solid #f1f5f9;vertical-align:middle;}
         $('#invEventDate').textContent = $('#eventDate')?.value?.trim() || '-';
 
         // 상단 우측 현재 시간 & 파일명
-        const now = new Date(); const pad = (n) => String(n).padStart(2, '0');
+        const now = new Date();
+        const pad = (n) => String(n).padStart(2, '0');
         const stamp = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())} ${pad(now.getHours())}:${pad(now.getMinutes())}:${pad(now.getSeconds())}`;
         document.querySelector('#invoicePrint .tag').textContent = stamp;
 
-        const yy = String(now.getFullYear()).slice(2); const mm = pad(now.getMonth() + 1); const dd = pad(now.getDate());
-        const firstItem = (window.items && [...items.values()][0]?.name) || '상품없음';
-        document.title = `${yy}${mm}${dd}_${orderName || '이름없음'}_${firstItem}`;
+        // ====== 여기부터: 파일 제목 규칙 반영 ======
+        // 날짜 (yyMMdd 유지; YYYYMMDD 원하면 아래 yy를 now.getFullYear()로 교체)
+        const yy = String(now.getFullYear()).slice(2);
+        const mm = pad(now.getMonth() + 1);
+        const dd = pad(now.getDate());
+        const datePart = `${yy}${mm}${dd}`;
+
+        // 메뉴 리스트: '건조 의뢰', '직접 건조' 제외하고 '|'로 연결
+        const excludeSet = new Set(['건조의뢰', '직접건조']); // 공백 제거 비교
+        const menuList = (window.items ? [...items.keys()] : [])
+            .filter(name => {
+                const n = norm(name); // 공백 제거
+                return !(/건조의뢰|직접건조/.test(n)); // 포함 여부로 필터
+            })
+            .join('|') || '상품없음';
+
+        document.title = `${datePart}_${orderName == '-' ? '이름없음': orderName}_${menuList}`;
+        // ====== 여기까지 ======
     }
+
 
     // 출력용 HTML (PDF용 iframe 주입에서 사용)
     function buildInvoiceHTML() {
